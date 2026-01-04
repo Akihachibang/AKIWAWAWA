@@ -486,7 +486,155 @@ spawn(function()
         end
     end
 end)
+-----------------------------------------------------
+local Section = TabFrame:NewSection({
+	Title = "FramMonster",
+	Icon = "rbxassetid://7743869054",
+	Position = "Left"
+})
+-------------------------------------------------------
+-- ================== CONFIG ==========================
+local ABOVE_HEIGHT = 6
+local ATTACK_DELAY = 0.15
 
+-- รายชื่อมอนเตอร์ที่สามารถเลือกฟาร์ม
+local MONSTERS = {
+    "Bulk Ghoul",
+    "First class Investigator",
+    "Rank 1 Investigator",
+    "Rank 2 Investigator",
+    "Rin Ghoul",
+    "Serpent Ghoul",
+    "Athlete",
+    "Human",
+    "Jason" -- มอนที่อยู่ใน workspace["AI/Player"].Boss.Jason
+}
+
+-- ================== SERVICES ========================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Player = Players.LocalPlayer
+
+-- ================== ATTACK REMOTE =====================
+local function NormalAttack()
+    local args = {
+        {
+            "NormalAttack",
+            "\002"
+        }
+    }
+    ReplicatedStorage:WaitForChild("BridgeNet2")
+        :WaitForChild("dataRemoteEvent")
+        :FireServer(unpack(args))
+end
+
+-- ================== FIND ENEMY (เลือกตัวใกล้ที่สุด + รองรับ Jason) =========================
+local function FindEnemy(name)
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+
+    if name == "Jason" then
+        -- กรณีพิเศษสำหรับ Jason
+        local bossFolder = workspace:FindFirstChild("AI")
+        if bossFolder and bossFolder:FindFirstChild("Player") and bossFolder.Player:FindFirstChild("Boss") then
+            local jason = bossFolder.Player.Boss:FindFirstChild("Jason")
+            if jason and jason:FindFirstChild("Humanoid") and jason:FindFirstChild("HumanoidRootPart") and jason.Humanoid.Health > 0 then
+                return jason
+            end
+        end
+        return nil
+    end
+
+    -- สำหรับมอนทั่วไป
+    for _,v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model")
+        and v.Name == name
+        and v:FindFirstChild("Humanoid")
+        and v:FindFirstChild("HumanoidRootPart")
+        and v.Humanoid.Health > 0 then
+
+            local distance = (v.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                closestEnemy = v
+            end
+        end
+    end
+
+    return closestEnemy
+end
+
+-- ================== TP ABOVE + FACE DOWN ====================
+local function TPAbove(enemyHRP)
+    local char = Player.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChild("Humanoid")
+    if not hrp or not hum then return end
+
+    hum:ChangeState(Enum.HumanoidStateType.Physics)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+
+    hrp.CFrame = CFrame.lookAt(
+        enemyHRP.Position + Vector3.new(0, ABOVE_HEIGHT, 0),
+        enemyHRP.Position
+    )
+end
+
+-- ================== MAIN LOOP ==========================
+_G.AutoFarmRunning = false
+_G.SelectedMonster = MONSTERS[1] -- เริ่มต้นเลือกตัวแรก
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+
+        if _G.AutoFarmRunning and _G.SelectedMonster then
+            local enemy = FindEnemy(_G.SelectedMonster)
+            if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+                repeat
+                    if not _G.AutoFarmRunning then break end
+                    task.wait(ATTACK_DELAY)
+
+                    -- วาปบนหัวมอนและหันหน้าลง
+                    TPAbove(enemy.HumanoidRootPart)
+
+                    -- ตี Remote
+                    NormalAttack()
+                until not _G.AutoFarmRunning
+                   or not enemy.Parent
+                   or enemy.Humanoid.Health <= 0
+            end
+        end
+    end
+end)
+
+-- ================== เชื่อม UI Dropdown ====================
+Section:NewDropdown({
+    Title = "Select Monster",
+    Data = MONSTERS,
+    Default = MONSTERS[1],
+    Callback = function(selection)
+        _G.SelectedMonster = selection
+        print("Selected Monster: "..selection)
+    end,
+})
+
+-- ================== UI Toggle เพื่อเปิด/ปิด Auto Farm ====================
+Section:NewToggle({
+    Title = "Auto Farm",
+    Default = false,
+    Callback = function(tr)
+        _G.AutoFarmRunning = tr
+        if tr then
+            print("✅ Auto Farm : ON")
+        else
+            print("⛔ Auto Farm : OFF")
+        end
+    end,
+})
 ---tap2จุดวาป
     local TabFrame = Windows:NewTab({
     	Title = "Teleport",
