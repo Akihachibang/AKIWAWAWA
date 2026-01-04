@@ -36,7 +36,7 @@
 -- SETTINGS
 --==================================================
 _G.AutoFarm = false
-_G.AboveHeight = 5
+_G.AboveHeight = 6
 _G.TweenSpeed = 180
 _G.AttackDelay = 0.01
 _G.HoldFTime = 2
