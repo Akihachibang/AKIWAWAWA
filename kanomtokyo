@@ -36,9 +36,9 @@
 -- SETTINGS
 --==================================================
 _G.AutoFarm = false
-_G.AboveHeight = 6
+_G.AboveHeight = 7
 _G.TweenSpeed = 180
-_G.AttackDelay = 0.01
+_G.AttackDelay = 0.001
 _G.HoldFTime = 2
 
 --==================================================
@@ -56,15 +56,14 @@ local Player = Players.LocalPlayer
 --==================================================
 -- ATTACK REMOTE
 --==================================================
-local AttackRemote = ReplicatedStorage
-    :WaitForChild("BridgeNet2")
-    :WaitForChild("dataRemoteEvent")
-
 local function NormalAttack()
-    AttackRemote:FireServer({
-        "NormalAttack",
-        "\t"
-    })
+    local args = {
+        {
+            "NormalAttack",
+            "\002"
+        }
+    }
+    ReplicatedStorage:WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
 end
 
 --==================================================
@@ -134,13 +133,13 @@ local function AcceptQuest(questName)
         if not _G.AutoFarm then return end
 
         TweenTo(npc.PrimaryPart.CFrame)
-        task.wait(0.5)
+        task.wait(0.2)
 
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
         task.wait(_G.HoldFTime)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
 
-        task.wait(1)
+        task.wait(0.1)
 
         for _, v in ipairs(Player.PlayerGui:GetDescendants()) do
             if not _G.AutoFarm then return end
@@ -150,16 +149,16 @@ local function AcceptQuest(questName)
                 if (label and label.Text:find("Understood"))
                 or (v:IsA("TextButton") and v.Text:find("Understood")) then
                     GuiService.SelectedObject = v
-                    task.wait(0.2)
+                    task.wait(0.005)
                     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-                    task.wait(0.1)
+                    task.wait(0.005)
                     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
                     break
                 end
             end
         end
 
-        task.wait(1)
+        task.wait(0.1)
     until HasQuest() or not _G.AutoFarm
 end
 
@@ -228,7 +227,7 @@ end)
 --==================================================
 Section:NewToggle({
     Title = "Auto Farm",
-    Default = false,
+    Default = false,    
     Callback = function(tr)
         _G.AutoFarm = tr
 
@@ -275,190 +274,8 @@ Section:NewToggle({
     	Position = "Left"
     })
 ---------------------------------------------
-    Section:NewToggle({
-    	Title = "Auto Kaneki",
-    	Default = false,
-    	Callback = function(tr)
-    if _G.KanekiFollowActive == nil then
-    	_G.KanekiFollowActive = false
-    end
-    
-    -- ถ้ามันเปิดอยู่ ให้หยุด
-    if _G.KanekiFollowActive then
-    	_G.KanekiFollowActive = false
-    	print(" หยุดการลอยตาม Kaneki แล้ว")
-    	if _G.KanekiFollowConnection then
-    		_G.KanekiFollowConnection:Disconnect()
-    		_G.KanekiFollowConnection = nil
-    	end
-    	return
-    end   
-    -- ถ้ายังไม่เปิด ให้เริ่มทำงาน
-    _G.KanekiFollowActive = true
-
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local player = Players.LocalPlayer
-    local char = player.Character or player.CharacterAdded:Wait()
-    
-    local function getHRP(model)
-    	if not model then return nil end
-    	return model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso")
-    end
-    
-    local aiFolder = workspace
-	    :WaitForChild("AI/Player", 5)
-	    :WaitForChild("Boss", 5)
-
-    local targetName = "Kaneki"
-    local followDistance = 3
-    local floatHeight = 2.5
-    local smoothing = 0.25
 
     
-    local function findTarget()
-    	if not aiFolder then return nil end
-    	for _, v in ipairs(aiFolder:GetChildren()) do
-    		if v.Name == targetName then
-    			return v
-    		end
-    	end
-    	return nil
-    end
-    
-    local hrp = getHRP(char)
-    if not hrp then
-    	char:WaitForChild("HumanoidRootPart", 10)
-    	hrp = getHRP(char)
-    end
-    
-    local target = findTarget()
-    if not target then
-    	_G.KanekiFollowActive = false
-    	return
-    end
-    
-    local targetHRP = getHRP(target)
-    if not targetHRP then
-    	_G.KanekiFollowActive = false
-    	return
-    end
-    
-    -- เริ่มลอยตาม
-    _G.KanekiFollowConnection = RunService.Heartbeat:Connect(function(dt)
-    	if not _G.KanekiFollowActive then return end
-    
-    	if not target or not target.Parent then
-    		target = findTarget()
-    		if target then
-    			targetHRP = getHRP(target)
-    		else
-    			return
-    		end
-    	end
-    	if not targetHRP or not targetHRP.Parent then
-    		targetHRP = getHRP(target)
-    		if not targetHRP then return end
-    	end
-    
-    	local behindPos = targetHRP.Position - (targetHRP.CFrame.LookVector * followDistance)
-    	behindPos = behindPos + Vector3.new(0, floatHeight, 0)
-    	local desiredCFrame = CFrame.new(behindPos, targetHRP.Position)
-    	local newCFrame = hrp.CFrame:lerp(desiredCFrame, math.clamp(smoothing, 0, 1))
-    	hrp.CFrame = newCFrame
-    end)
-    
-    	end,
-    })
--------------------------- ------------------  
-    Section:NewToggle({
-    	Title = "Auto Json",
-    	Default = false,
-    	Callback = function(tr)
-        -- Toggle
-if _G.JasonFollowActive == nil then
-	_G.JasonFollowActive = false
-end
-
--- ถ้ากำลังทำงานอยู่ -> หยุด
-if _G.JasonFollowActive then
-	_G.JasonFollowActive = false
-	if _G.JasonFollowConnection then
-		_G.JasonFollowConnection:Disconnect()
-		_G.JasonFollowConnection = nil
-	end
-	return
-end
-
--- เริ่มทำงาน
-_G.JasonFollowActive = true
-
--- Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local player = Players.LocalPlayer
-
--- ดึง HRP
-local function getHRP(model)
-	if not model then return nil end
-	return model:FindFirstChild("HumanoidRootPart")
-		or model:FindFirstChild("UpperTorso")
-		or model:FindFirstChild("Torso")
-end
-
--- ตั้งค่า
-local followDistance = 3
-local floatHeight = 2.5
-local smoothing = 0.25
-
--- เริ่มตาม
-local function startFollowing(character)
-	local hrp = getHRP(character)
-	if not hrp then
-		character:WaitForChild("HumanoidRootPart", 10)
-		hrp = getHRP(character)
-	end
-	if not hrp then return end
-
-	_G.JasonFollowConnection = RunService.Heartbeat:Connect(function()
-		if not _G.JasonFollowActive then return end
-
-		local aiFolder = workspace:FindFirstChild("AI/Player")
-		if not aiFolder then return end
-
-		local bossFolder = aiFolder:FindFirstChild("Boss")
-		if not bossFolder then return end
-
-		local target = bossFolder:FindFirstChild("Jason")
-		if not target then return end
-
-		local targetHRP = getHRP(target)
-		if not targetHRP then return end
-
-		local behindPos =
-			targetHRP.Position
-			- (targetHRP.CFrame.LookVector * followDistance)
-			+ Vector3.new(0, floatHeight, 0)
-
-		local desiredCFrame = CFrame.new(behindPos, targetHRP.Position)
-		hrp.CFrame = hrp.CFrame:Lerp(desiredCFrame, math.clamp(smoothing, 0, 1))
-	end)
-end
-
--- ตัวละครตาย / เกิดใหม่
-local function onCharacterAdded(character)
-	if not _G.JasonFollowActive then return end
-	startFollowing(character)
-end
-
--- เริ่มครั้งแรก
-if player.Character then
-	startFollowing(player.Character)
-end
-player.CharacterAdded:Connect(onCharacterAdded)
-
-    	end,
-    })
 ----------------------------
     InfoSection:NewTitle('Join Discord')
     InfoSection:NewButton({
@@ -583,156 +400,93 @@ end)
 	end,
 })
 ---อัปสเต็ด
-    local Section = TabFrame:NewSection({
-	Title = "Stats",
-	Icon = "rbxassetid://7743869054",
-	Position = "Left"
-    })
--------------------------------
-    Section:NewToggle({
-	Title = "Damage",
-	Default = false,
-	Callback = function(tr)
-		-- 🔁 ระบบเปิด/ปิดการทำงานของสคริปโดยการ execute ซ้ำ
-    if _G.ToggleDamageSpam == nil then
-        _G.ToggleDamageSpam = false
-    end
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
 
-    _G.ToggleDamageSpam = not _G.ToggleDamageSpam
+-- เริ่มต้น Section ตามที่คุณให้
+local Section = TabFrame:NewSection({
+    Title = "Stats", 
+    Icon = "rbxassetid://7743869054",
+    Position = "Left"
+})
 
-    if _G.ToggleDamageSpam then
-        warn("ระบบยิง Damage เริ่มทำงานแล้ว")
-            task.spawn(function()
-                while _G.ToggleDamageSpam and task.wait(0.1) do -- ปรับความเร็วได้ (0.1 = 10 ครั้งต่อวินาที)
-                    local args = {
-                {
-                    {
-                        "Damage",
-                        1
-                    },
-                    "\002"
-                }
-            }
-            local success, err = pcall(function()
-                game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
-            end)
-            if not success then
-                warn(" เกิดข้อผิดพลาด:", err)
+-- เก็บค่า Toggle + Slider
+local autoValues = {
+    Damage = false,
+    Durability = false,
+    Stamina = false,
+    Speed = false,
+    Amount = 25
+}
+
+-- ฟังก์ชันยิงรีโมท
+local function fireRemote(stat, amount)
+    local args = {
+        {
+            { stat, amount },
+            "\v"
+        }
+    }
+    ReplicatedStorage:WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+end
+
+-- สร้าง Toggle ตามลำดับ
+Section:NewToggle({
+    Title = "Damage",
+    Default = false,
+    Callback = function(tr)
+        autoValues.Damage = tr
+    end,
+})
+
+Section:NewToggle({
+    Title = "Durability",
+    Default = false,
+    Callback = function(tr)
+        autoValues.Durability = tr
+    end,
+})
+
+Section:NewToggle({
+    Title = "Stamina",
+    Default = false,
+    Callback = function(tr)
+        autoValues.Stamina = tr
+    end,
+})
+
+Section:NewToggle({
+    Title = "Speed",
+    Default = false,
+    Callback = function(tr)
+        autoValues.Speed = tr
+    end,
+})
+
+-- Slider วางล่างสุด
+Section:NewSlider({
+    Title = "Amount",
+    Min = 1,
+    Max = 50,
+    Default = 25,
+    Callback = function(a)
+        autoValues.Amount = a
+    end,
+})
+
+-- Loop ยิงรัว
+spawn(function()
+    while true do
+        task.wait(0.1) -- ปรับความเร็วรัวได้
+        for stat, enabled in pairs(autoValues) do
+            if enabled and stat ~= "Amount" then
+                fireRemote(stat, autoValues.Amount)
             end
         end
-        warn(" ระบบยิง Damage หยุดทำงานแล้ว")
-    end)
-        else
-    warn(" ระบบยิง Damage ถูกปิด")
-        end
-	end,
-    })
----------------------------------------------
-    Section:NewToggle({
-	Title = "Durability",
-	Default = false,
-	Callback = function(tr)
-            if _G.ToggleDurability == nil then
-    _G.ToggleDurability = false
     end
+end)
 
-    _G.ToggleDurability = not _G.ToggleDurability
-
-    if _G.ToggleDurability then
-        warn(" ระบบ Durability เริ่มทำงานแล้ว")
-            task.spawn(function()
-                while _G.ToggleDurability and task.wait(0.1) do
-                    local args = {
-                {
-                    {
-                        "Durability",
-                        1
-                    },
-                    "\002"
-                }
-            }
-            pcall(function()
-                game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
-            end)
-        end
-            warn(" ระบบ Durability หยุดทำงานแล้ว")
-        end)
-    else
-        warn(" ระบบ Durability ถูกปิด")
-    end
-
-	end,
-    })  
-------------------------------------------------
-    Section:NewToggle({
-	Title = "Stamina",
-	Default = false,
-	Callback = function(tr)
-		    if _G.ToggleStamina == nil then
-        _G.ToggleStamina = false
-    end
-
-    _G.ToggleStamina = not _G.ToggleStamina
-
-    if _G.ToggleStamina then
-        warn(" ระบบ Stamina เริ่มทำงานแล้ว")
-        task.spawn(function()
-            while _G.ToggleStamina and task.wait(0.1) do
-                local args = {
-                 {
-                    {
-                        "Stamina",
-                        1
-                    },
-                    "\002"
-                }
-            }
-            pcall(function()
-                game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
-            end)
-        end
-             warn(" ระบบ Stamina หยุดทำงานแล้ว")
-        end)
-    else
-        warn(" ระบบ Stamina ถูกปิด")
-        end
-	end,
-    })
-------------------------------------------------------- 
-    Section:NewToggle({
-	Title = "Speed",
-	Default = false,
-	Callback = function(tr)
-		if _G.ToggleSpeed == nil then
-    _G.ToggleSpeed = false
-        end
-
-    _G.ToggleSpeed = not _G.ToggleSpeed
-
-    if _G.ToggleSpeed then
-         warn(" ระบบ Speed เริ่มทำงานแล้ว")
-            task.spawn(function()
-        while _G.ToggleSpeed and task.wait(0.1) do
-            local args = {
-                {
-                    {
-                        "Speed",
-                        1
-                    },
-                    "\002"
-                }
-            }
-            pcall(function()
-                game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
-            end)
-        end
-        warn(" ระบบ Speed หยุดทำงานแล้ว")
-    end)
-        else
-    warn(" ระบบ Speed ถูกปิด")
-        end
-	end,
-    })
 ---tap2จุดวาป
     local TabFrame = Windows:NewTab({
     	Title = "Teleport",
@@ -754,7 +508,7 @@ end)
     local hrp = character:WaitForChild("HumanoidRootPart")
     
     -- พิกัดที่ต้องการวาป
-    local targetPosition = Vector3.new(-605, 36, -336)
+    local targetPosition = Vector3.new(182, 6, -479)
     
     -- ฟังก์ชันวาป
     local function teleport()
@@ -775,7 +529,7 @@ end)
     local hrp = character:WaitForChild("HumanoidRootPart")
     
     -- พิกัดที่ต้องการวาป
-    local targetPosition = Vector3.new(14, 50, -259)
+    local targetPosition = Vector3.new(-107, 5, 206)
     
     -- ฟังก์ชันวาป
     local function teleport()
@@ -796,7 +550,7 @@ end)
     local hrp = character:WaitForChild("HumanoidRootPart")
     
     -- พิกัดที่ต้องการวาป
-    local targetPosition = Vector3.new(-263, 35, 408)
+    local targetPosition = Vector3.new(-86, 5, -161)
     
     -- ฟังก์ชันวาป
     local function teleport()
@@ -818,7 +572,7 @@ end)
     local hrp = character:WaitForChild("HumanoidRootPart")
     
     -- พิกัดที่ต้องการวาป
-    local targetPosition = Vector3.new(479, 35, -27)
+    local targetPosition = Vector3.new(143, 5, 620)
     
     -- ฟังก์ชันวาป
     local function teleport()
