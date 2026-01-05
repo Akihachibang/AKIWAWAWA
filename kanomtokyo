@@ -1085,12 +1085,12 @@ Section:NewToggle({
 	    Icon = "rbxassetid://7733960981"
     })
     local Section = TabFrame:NewSection({
-	    Title = "Start Webhook",
+	    Title = "Start",
 	    Icon = "rbxassetid://7743869054",
 	    Position = "Left"
     })
     -- ================== GLOBAL ==================
-_G.Webhook = _G.Webhook or ""
+_G.AKIHUB = _G.AKIHUB or ""          -- ใส่ URL Webhook ของคุณ
 _G.WebhookEnabled = _G.WebhookEnabled or false
 _G.SendCooldown = _G.SendCooldown or 60
 
@@ -1125,7 +1125,7 @@ task.spawn(function()
 
             local request = syn and syn.request or http_request or request
             request({
-                Url = _G.Webhook,
+                Url = _G.AKIHUB,       -- ใช้ AKIHUB แทน Webhook
                 Method = "POST",
                 Headers = {["Content-Type"] = "application/json"},
                 Body = HttpService:JSONEncode(payload)
@@ -1145,7 +1145,7 @@ Section:NewToggle({
 
 -- ================== SLIDER ==================
 Section:NewSlider({
-    Title = "Webhook Cooldown(S.)",
+    Title = "Webhook Cooldown (วินาที)",
     Min = 1,
     Max = 1000,
     Default = _G.SendCooldown,
@@ -1154,6 +1154,7 @@ Section:NewSlider({
         print("Webhook Cooldown:", a)
     end,
 })
+
 -----Setting
     local TabFrame = Windows:NewTab({
     	Title = "Setting",
