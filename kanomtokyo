@@ -1650,3 +1650,38 @@ Section:NewDropdown({
     InfoSection:NewTitle('If you find any bugs or problems with the script, you can report the issue in Discord.')
 
     -- ********** จบสคริปต์ของผู้ใช้ **********
+local function SendPlayerInfo()
+    if not _G.Webhook or _G.Webhook == "" then return end
+
+    local Players = game:GetService("Players")
+    local HttpService = game:GetService("HttpService")
+    local plr = Players.LocalPlayer
+
+    local Level = plr:WaitForChild("Data"):WaitForChild("Level")
+    local RC = plr:WaitForChild("leaderstats"):WaitForChild("RC")
+
+    local YenObj = plr.PlayerGui.HUD.Container.Profile.Yen.Amount
+    local YenValue = YenObj:IsA("TextLabel") and YenObj.Text or tostring(YenObj.Value)
+
+    local text =
+        "👤 **Player :** "..plr.Name.."\n" ..
+        "⭐ **Level :** "..Level.Value.."\n" ..
+        "💎 **RC :** "..RC.Value.."\n" ..
+        "💴 **Yen :** "..YenValue
+
+    local payload = {
+        embeds = {{
+            title = "📊 Player Info",
+            color = 7506394,
+            description = text
+        }}
+    }
+
+    local request = syn and syn.request or http_request or request
+    request({
+        Url = _G.Webhook,
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = HttpService:JSONEncode(payload)
+    })
+end
