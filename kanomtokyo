@@ -717,10 +717,10 @@ local Section = TabFrame:NewSection({
 })
 -------------------------------------------------------
 -- ================== CONFIG ==========================
-local ABOVE_HEIGHT = 6
-local ATTACK_DELAY = 0.15
+_G.Distance = 10          -- ระยะห่างใต้มอน (ปรับจาก Slider)
+local ATTACK_DELAY = 0.001
 
--- รายชื่อมอนเตอร์ที่สามารถเลือกฟาร์ม
+-- รายชื่อมอนเตอร์ (ลบ Jason ออกแล้ว)
 local MONSTERS = {
     "Bulk Ghoul",
     "First class Investigator",
@@ -729,8 +729,7 @@ local MONSTERS = {
     "Rin Ghoul",
     "Serpent Ghoul",
     "Athlete",
-    "Human",
-    "Jason" -- มอนที่อยู่ใน workspace["AI/Player"].Boss.Jason
+    "Human"
 }
 
 -- ================== SERVICES ========================
@@ -751,24 +750,13 @@ local function NormalAttack()
         :FireServer(unpack(args))
 end
 
--- ================== FIND ENEMY (เลือกตัวใกล้ที่สุด + รองรับ Jason) =========================
+-- ================== FIND ENEMY (ใกล้ที่สุด) =========================
 local function FindEnemy(name)
     local closestEnemy = nil
     local shortestDistance = math.huge
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
 
-    if name == "Jason" then
-        -- กรณีพิเศษสำหรับ Jason
-        local bossFolder = workspace:FindFirstChild("AI")
-        if bossFolder and bossFolder:FindFirstChild("Player") and bossFolder.Player:FindFirstChild("Boss") then
-            local jason = bossFolder.Player.Boss:FindFirstChild("Jason")
-            if jason and jason:FindFirstChild("Humanoid") and jason:FindFirstChild("HumanoidRootPart") and jason.Humanoid.Health > 0 then
-                return jason
-            end
-        end
-        return nil
-    end
-
-    -- สำหรับมอนทั่วไป
     for _,v in pairs(workspace:GetDescendants()) do
         if v:IsA("Model")
         and v.Name == name
@@ -776,7 +764,7 @@ local function FindEnemy(name)
         and v:FindFirstChild("HumanoidRootPart")
         and v.Humanoid.Health > 0 then
 
-            local distance = (v.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).Magnitude
+            local distance = (v.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
             if distance < shortestDistance then
                 shortestDistance = distance
                 closestEnemy = v
@@ -787,8 +775,8 @@ local function FindEnemy(name)
     return closestEnemy
 end
 
--- ================== TP ABOVE + FACE DOWN ====================
-local function TPAbove(enemyHRP)
+-- ================== TP ใต้มอน + หันหน้าขึ้น ====================
+local function TPUnder(enemyHRP)
     local char = Player.Character
     if not char then return end
 
@@ -800,15 +788,16 @@ local function TPAbove(enemyHRP)
     hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
 
+    -- อยู่ใต้มอน และหันหน้าขึ้นหามอน
     hrp.CFrame = CFrame.lookAt(
-        enemyHRP.Position + Vector3.new(0, ABOVE_HEIGHT, 0),
+        enemyHRP.Position - Vector3.new(0, _G.Distance, 0),
         enemyHRP.Position
     )
 end
 
 -- ================== MAIN LOOP ==========================
 _G.AutoFarmRunning = false
-_G.SelectedMonster = MONSTERS[1] -- เริ่มต้นเลือกตัวแรก
+_G.SelectedMonster = MONSTERS[1]
 
 task.spawn(function()
     while true do
@@ -821,10 +810,10 @@ task.spawn(function()
                     if not _G.AutoFarmRunning then break end
                     task.wait(ATTACK_DELAY)
 
-                    -- วาปบนหัวมอนและหันหน้าลง
-                    TPAbove(enemy.HumanoidRootPart)
+                    -- วาปไปใต้มอน
+                    TPUnder(enemy.HumanoidRootPart)
 
-                    -- ตี Remote
+                    -- ตี
                     NormalAttack()
                 until not _G.AutoFarmRunning
                    or not enemy.Parent
@@ -834,7 +823,7 @@ task.spawn(function()
     end
 end)
 
--- ================== เชื่อม UI Dropdown ====================
+-- ================== UI Dropdown ====================
 Section:NewDropdown({
     Title = "Select Monster",
     Data = MONSTERS,
@@ -845,7 +834,19 @@ Section:NewDropdown({
     end,
 })
 
--- ================== UI Toggle เพื่อเปิด/ปิด Auto Farm ====================
+-- ================== UI Slider (ปรับระยะใต้มอน) ====================
+Section:NewSlider({
+    Title = "Distance",
+    Min = 1,
+    Max = 50,
+    Default = 10,
+    Callback = function(a)
+        _G.Distance = a
+        print("Distance set to:", a)
+    end,
+})
+
+-- ================== UI Toggle ====================
 Section:NewToggle({
     Title = "Auto Farm",
     Default = false,
@@ -858,6 +859,7 @@ Section:NewToggle({
         end
     end,
 })
+
 ---tap2จุดวาป
     local TabFrame = Windows:NewTab({
     	Title = "Teleport",
@@ -1358,6 +1360,29 @@ end)
 print("[BoosFPS]")
 	end,
 })
+
+Section:NewButton({
+	Title = "Free HeadLess",
+	Callback = function()
+		local player = game.Players.LocalPlayer
+		local char = player.Character or player.CharacterAdded:Wait()
+
+		local head = char:FindFirstChild("Head")
+		if head then
+			-- ทำให้หัวล่องหน
+			head.Transparency = 1
+			head.CanCollide = false
+
+			-- ลบหน้า (Decal) ออกด้วย
+			for _, v in pairs(head:GetChildren()) do
+				if v:IsA("Decal") then
+					v:Destroy()
+				end
+			end
+		end
+	end,
+})
+
 --==================================================
 -- SECTION
 --==================================================
