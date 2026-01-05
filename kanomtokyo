@@ -40,7 +40,7 @@ _G.AttackDelay = 0.001
 _G.HoldFTime = 2
 
 _G.FlyPosition = "Above"      -- Above / Below
-_G.DistanceFromEnemy = 9     -- ระยะจากมอน
+_G.DistanceFromEnemy = 9      -- ระยะจากมอน
 
 --==================================================
 -- SERVICES
@@ -82,7 +82,7 @@ end
 -- QUEST TABLE
 --==================================================
 local QuestTable = {
-    {1, 49,   "QuestGiver (Lv.1-Lv.50)",   "Human"},
+    {1, 49,   "QuestGiver (Lv.1-Lv.50)",   "Human,Athlete"},
     {50,149,  "QuestGiver (Lv.50-Lv.150)", "Rank 2 Investigator"},
     {150,249, "QuestGiver (Lv.150-Lv.250)","Bulk Ghoul"},
     {250,349, "QuestGiver (Lv.250-Lv.350)","Rank 1 Investigator"},
@@ -127,7 +127,7 @@ local function TweenTo(cf)
 end
 
 --==================================================
--- ACCEPT QUEST
+-- ACCEPT QUEST (กด F ครั้งเดียวแต่เร็ว)
 --==================================================
 local function AcceptQuest(questName)
     local npc = workspace.TalkNpc.QuestGiver:FindFirstChild(questName)
@@ -139,12 +139,12 @@ local function AcceptQuest(questName)
         TweenTo(npc.PrimaryPart.CFrame)
         task.wait(0.2)
 
+        -- กด F ครั้งเดียว แต่เร็ว
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-        task.wait(_G.HoldFTime)
+        task.wait(2)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
 
-        task.wait(0.1)
-
+        -- ตรวจสอบปุ่ม "Understood" และกด Return
         for _, v in ipairs(Player.PlayerGui:GetDescendants()) do
             if not _G.AutoFarm then return end
 
@@ -155,12 +155,13 @@ local function AcceptQuest(questName)
                     GuiService.SelectedObject = v
                     task.wait()
                     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-                    task.wait()
+                    task.wait(0.05)
                     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
                     break
                 end
             end
         end
+
         task.wait(0.1)
     until HasQuest() or not _G.AutoFarm
 end
@@ -204,34 +205,50 @@ local function FindEnemy(name)
 end
 
 --==================================================
--- MAIN LOOP
+-- MAIN LOOP (ฟาร์มหลายตัว + ตรวจสอบ enemyNames ปลอดภัย)
 --==================================================
 task.spawn(function()
     while task.wait(0.25) do
         if not _G.AutoFarm then continue end
 
-        local questName, enemyName = GetQuestData()
-        if not questName then continue end
+        local questName, enemyNames = GetQuestData()
+        if not questName or not enemyNames then continue end
 
         if not HasQuest() then
             AcceptQuest(questName)
             continue
         end
 
-        local enemy = FindEnemy(enemyName)
-        if enemy then
-            repeat
-                if not _G.AutoFarm then break end
-                TPToEnemy(enemy.HumanoidRootPart)
-                NormalAttack()
-                task.wait(_G.AttackDelay)
-            until enemy.Humanoid.Health <= 0 or not enemy.Parent
+        -- สร้างตาราง enemiesToFarm และตรวจสอบ type
+        local enemiesToFarm = {}
+        if type(enemyNames) == "string" and enemyNames ~= "" then
+            for name in string.gmatch(enemyNames, "[^,]+") do
+                if type(name) == "string" then
+                    local cleanName = name:gsub("%s+", "")
+                    if cleanName ~= "" then
+                        table.insert(enemiesToFarm, cleanName)
+                    end
+                end
+            end
+        end
+
+        -- ฟาร์มทีละตัว
+        for _, enemyName in ipairs(enemiesToFarm) do
+            local enemy = FindEnemy(enemyName)
+            if enemy then
+                repeat
+                    if not _G.AutoFarm then break end
+                    TPToEnemy(enemy.HumanoidRootPart)
+                    NormalAttack()
+                    task.wait(_G.AttackDelay)
+                until enemy.Humanoid.Health <= 0 or not enemy.Parent
+            end
         end
     end
 end)
 
 --==================================================
--- UI (Dropdown + Slider อยู่บนสุด)
+-- UI (Dropdown + Slider + Toggle)
 --==================================================
 Section:NewDropdown({
     Title = "Position",
@@ -260,34 +277,30 @@ Section:NewToggle({
     end,
 })
 
---------------------------------    
-    Section:NewToggle({
-    	Title = "Auto Use Waepon",
-    	Default = false,
-    	Callback = function(tr)
-    		--  Script: Auto press E every time you respawn
-    
-    local player = game.Players.LocalPlayer
-    
-    -- ฟังก์ชันกดปุ่ม E
-    local function pressE()
-        local VirtualInputManager = game:GetService("VirtualInputManager")
-        task.wait(1) -- หน่วงเล็กน้อยหลังเกิดใหม่ เพื่อให้ตัวละครโหลดเสร็จ
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(0.1)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    end
-    
-    -- รันตอนเริ่มเกม
-    pressE()
-    
-    -- รันอีกครั้งทุกครั้งที่ตัวละครเกิดใหม่
-    player.CharacterAdded:Connect(function()
+--==================================================
+-- Auto Use Weapon
+--==================================================
+Section:NewToggle({
+    Title = "Auto Use Weapon",
+    Default = false,
+    Callback = function(tr)
+        local player = game.Players.LocalPlayer
+
+        local function pressE()
+            local VirtualInputManager = game:GetService("VirtualInputManager")
+            task.wait(1)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end
+
         pressE()
-    end)
-    
-    	end,
-    })
+        player.CharacterAdded:Connect(function()
+            pressE()
+        end)
+    end,
+})
+
 ---ฆ่าบอส
     local Section = TabFrame:NewSection({
     	Title = "Boss Target",
