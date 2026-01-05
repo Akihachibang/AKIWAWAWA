@@ -1090,7 +1090,7 @@ Section:NewToggle({
 	    Position = "Left"
     })
     -- ================== GLOBAL ==================
-_G.AKIHUB = _G.AKIHUB or ""          -- ใส่ URL Webhook ของคุณ
+_G.Webhook = _G.Webhook or ""
 _G.WebhookEnabled = _G.WebhookEnabled or false
 _G.SendCooldown = _G.SendCooldown or 60
 
@@ -1125,7 +1125,7 @@ task.spawn(function()
 
             local request = syn and syn.request or http_request or request
             request({
-                Url = _G.AKIHUB,       -- ใช้ AKIHUB แทน Webhook
+                Url = _G.Webhook,
                 Method = "POST",
                 Headers = {["Content-Type"] = "application/json"},
                 Body = HttpService:JSONEncode(payload)
@@ -1154,7 +1154,6 @@ Section:NewSlider({
         print("Webhook Cooldown:", a)
     end,
 })
-
 -----Setting
     local TabFrame = Windows:NewTab({
     	Title = "Setting",
