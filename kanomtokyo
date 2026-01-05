@@ -60,7 +60,7 @@ local function NormalAttack()
     local args = {
         {
             "NormalAttack",
-            "\002"
+            "\n"
         }
     }
     ReplicatedStorage
@@ -325,7 +325,7 @@ local attackRemote =
 local attackArgs = {
 	{
 		"NormalAttack",
-		"\002"
+		"\n"
 	}
 }
 
@@ -717,7 +717,9 @@ local Section = TabFrame:NewSection({
 })
 -------------------------------------------------------
 -- ================== CONFIG ==========================
-_G.Distance = 10          -- ระยะห่างใต้มอน (ปรับจาก Slider)
+local Distance = 10
+local AutoFarmRunning = false
+local SelectedMonster = nil
 local ATTACK_DELAY = 0.001
 
 local MONSTERS = {
@@ -736,45 +738,32 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 
--- ================== ATTACK REMOTE =====================
+-- ================== ATTACK REMOTE ===================
 local function NormalAttack()
-    local args = {
-        {
-            "NormalAttack",
-            "\002"
-        }
-    }
-    ReplicatedStorage:WaitForChild("BridgeNet2")
+    ReplicatedStorage
+        :WaitForChild("BridgeNet2")
         :WaitForChild("dataRemoteEvent")
-        :FireServer(unpack(args))
+        :FireServer({
+            "NormalAttack",
+            "\n"
+        })
 end
 
--- ================== FIND ENEMY (ใกล้ที่สุด) =========================
+-- ================== FIND ENEMY (ล็อคตัวแรกที่เจอ) =========
 local function FindEnemy(name)
-    local closestEnemy = nil
-    local shortestDistance = math.huge
-    local char = Player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
-
-    for _,v in pairs(workspace:GetDescendants()) do
+    for _, v in ipairs(workspace:GetDescendants()) do
         if v:IsA("Model")
         and v.Name == name
         and v:FindFirstChild("Humanoid")
         and v:FindFirstChild("HumanoidRootPart")
         and v.Humanoid.Health > 0 then
-
-            local distance = (v.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
-            if distance < shortestDistance then
-                shortestDistance = distance
-                closestEnemy = v
-            end
+            return v
         end
     end
-
-    return closestEnemy
+    return nil
 end
 
--- ================== TP ใต้มอน + หันหน้าขึ้น ====================
+-- ================== TP ใต้มอน =====================
 local function TPUnder(enemyHRP)
     local char = Player.Character
     if not char then return end
@@ -783,86 +772,85 @@ local function TPUnder(enemyHRP)
     local hum = char:FindFirstChild("Humanoid")
     if not hrp or not hum then return end
 
-    hum:ChangeState(Enum.HumanoidStateType.Physics)
+    -- ป้องกันชนสคริปต์อื่น
+    if hum:GetState() ~= Enum.HumanoidStateType.Physics then
+        hum:ChangeState(Enum.HumanoidStateType.Physics)
+    end
+
     hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
 
-    -- อยู่ใต้มอน และหันหน้าขึ้นหามอน
     hrp.CFrame = CFrame.lookAt(
-        enemyHRP.Position - Vector3.new(0, _G.Distance, 0),
+        enemyHRP.Position - Vector3.new(0, Distance, 0),
         enemyHRP.Position
     )
 end
 
--- ================== MAIN LOOP ==========================
-_G.AutoFarmRunning = false
-_G.SelectedMonster = MONSTERS[1]
+-- ================== MAIN SYSTEM ======================
+local CurrentEnemy = nil
+local Heartbeat = game:GetService("RunService").Heartbeat
 
-task.spawn(function()
-    while true do
-        task.wait(0.2)
+Heartbeat:Connect(function()
+    if not AutoFarmRunning then
+        CurrentEnemy = nil
+        return
+    end
 
-        if _G.AutoFarmRunning and _G.SelectedMonster then
-            local enemy = FindEnemy(_G.SelectedMonster)
-            if enemy and enemy:FindFirstChild("HumanoidRootPart") then
-                repeat
-                    if not _G.AutoFarmRunning then break end
-                    task.wait(ATTACK_DELAY)
+    -- หาเป้าใหม่เฉพาะตอนจำเป็น
+    if not CurrentEnemy
+    or not CurrentEnemy.Parent
+    or CurrentEnemy.Humanoid.Health <= 0 then
+        CurrentEnemy = FindEnemy(SelectedMonster)
+    end
 
-                    -- วาปไปใต้มอน
-                    TPUnder(enemy.HumanoidRootPart)
-
-                    -- ตี
-                    NormalAttack()
-                until not _G.AutoFarmRunning
-                   or not enemy.Parent
-                   or enemy.Humanoid.Health <= 0
-            end
-        end
+    -- ตีเฉพาะตัวที่ล็อค
+    if CurrentEnemy and CurrentEnemy:FindFirstChild("HumanoidRootPart") then
+        TPUnder(CurrentEnemy.HumanoidRootPart)
+        NormalAttack()
+        task.wait(ATTACK_DELAY)
     end
 end)
 
--- ================== UI Dropdown ====================
+-- ================== UI ==============================
+
 Section:NewDropdown({
     Title = "Select Monster",
     Data = MONSTERS,
     Default = MONSTERS[1],
-    Callback = function(selection)
-        _G.SelectedMonster = selection
-        print("Selected Monster: "..selection)
+    Callback = function(v)
+        SelectedMonster = v
+        CurrentEnemy = nil
+        print("🎯 Selected:", v)
     end,
 })
 
--- ================== UI Slider (ปรับระยะใต้มอน) ====================
 Section:NewSlider({
-    Title = "Distance Monster",
+    Title = "Distance Under Monster",
     Min = 1,
     Max = 50,
     Default = 10,
-    Callback = function(a)
-        _G.Distance = a
-        print("Distance set to:", a)
+    Callback = function(v)
+        Distance = v
     end,
 })
 
--- ================== UI Toggle ====================
 Section:NewToggle({
     Title = "Auto Farm Monster",
     Default = false,
-    Callback = function(tr)
-        _G.AutoFarmRunning = tr
-        if tr then
-            print("✅ Auto Farm : ON")
-        else
-            print("⛔ Auto Farm : OFF")
+    Callback = function(state)
+        AutoFarmRunning = state
+        if not state then
+            CurrentEnemy = nil
+            local char = Player.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
         end
     end,
 })
 -- ================== CONFIG ==========================
 _G.Distance = 10
 local ATTACK_DELAY = 0.001
-
--- รายชื่อมอนเตอร์ (ไม่มี Jason)
 local MONSTERS = {
     "Bulk Ghoul",
     "First class Investigator",
@@ -884,7 +872,7 @@ local function NormalAttack()
     local args = {
         {
             "NormalAttack",
-            "\002"
+            "\n"
         }
     }
     ReplicatedStorage:WaitForChild("BridgeNet2")
@@ -993,7 +981,7 @@ Section:NewToggle({
         print(state and "✅ Auto Farm : ON" or "⛔ Auto Farm : OFF")
     end,
 })
----tap2จุดวาป
+-----------------------------------------------------------------------------------------tap2จุดวาป
     local TabFrame = Windows:NewTab({
     	Title = "Teleport",
     	Description = "Teleport To Savezone and Boss",
