@@ -1078,7 +1078,83 @@ Section:NewToggle({
     
     	end,
     })
----Setting
+-----WEBHOOK
+    local TabFrame = Windows:NewTab({
+	    Title = "Webhook",
+	    Description = "Webhook Tab",
+	    Icon = "rbxassetid://7733960981"
+    })
+    local Section = TabFrame:NewSection({
+	    Title = "Start Webhook",
+	    Icon = "rbxassetid://7743869054",
+	    Position = "Left"
+    })
+    -- ================== GLOBAL ==================
+_G.Webhook = _G.Webhook or ""
+_G.WebhookEnabled = _G.WebhookEnabled or false
+_G.SendCooldown = _G.SendCooldown or 60
+
+-- ================== SEND LOOP ==================
+task.spawn(function()
+    while task.wait(1) do
+        if _G.WebhookEnabled then
+            task.wait(_G.SendCooldown)
+
+            local Players = game:GetService("Players")
+            local HttpService = game:GetService("HttpService")
+            local plr = Players.LocalPlayer
+
+            local Level = plr.Data.Level
+            local RC = plr.leaderstats.RC
+            local YenObj = plr.PlayerGui.HUD.Container.Profile.Yen.Amount
+            local YenValue = YenObj:IsA("TextLabel") and YenObj.Text or tostring(YenObj.Value)
+
+            local text =
+                "👤 **Player :** "..plr.Name.."\n" ..
+                "⭐ **Level :** "..Level.Value.."\n" ..
+                "💎 **RC :** "..RC.Value.."\n" ..
+                "💴 **Yen :** "..YenValue
+
+            local payload = {
+                embeds = {{
+                    title = "📊 Player Info",
+                    color = 7506394,
+                    description = text
+                }}
+            }
+
+            local request = syn and syn.request or http_request or request
+            request({
+                Url = _G.Webhook,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(payload)
+            })
+        end
+    end
+end)
+
+-- ================== TOGGLE ==================
+Section:NewToggle({
+    Title = "Webhook",
+    Default = false,
+    Callback = function(tr)
+        _G.WebhookEnabled = tr
+    end,
+})
+
+-- ================== SLIDER ==================
+Section:NewSlider({
+    Title = "Webhook Cooldown(S.)",
+    Min = 1,
+    Max = 1000,
+    Default = _G.SendCooldown,
+    Callback = function(a)
+        _G.SendCooldown = a
+        print("Webhook Cooldown:", a)
+    end,
+})
+-----Setting
     local TabFrame = Windows:NewTab({
     	Title = "Setting",
     	Description = "Setting tab",
@@ -1650,38 +1726,3 @@ Section:NewDropdown({
     InfoSection:NewTitle('If you find any bugs or problems with the script, you can report the issue in Discord.')
 
     -- ********** จบสคริปต์ของผู้ใช้ **********
-local function SendPlayerInfo()
-    if not _G.Webhook or _G.Webhook == "" then return end
-
-    local Players = game:GetService("Players")
-    local HttpService = game:GetService("HttpService")
-    local plr = Players.LocalPlayer
-
-    local Level = plr:WaitForChild("Data"):WaitForChild("Level")
-    local RC = plr:WaitForChild("leaderstats"):WaitForChild("RC")
-
-    local YenObj = plr.PlayerGui.HUD.Container.Profile.Yen.Amount
-    local YenValue = YenObj:IsA("TextLabel") and YenObj.Text or tostring(YenObj.Value)
-
-    local text =
-        "👤 **Player :** "..plr.Name.."\n" ..
-        "⭐ **Level :** "..Level.Value.."\n" ..
-        "💎 **RC :** "..RC.Value.."\n" ..
-        "💴 **Yen :** "..YenValue
-
-    local payload = {
-        embeds = {{
-            title = "📊 Player Info",
-            color = 7506394,
-            description = text
-        }}
-    }
-
-    local request = syn and syn.request or http_request or request
-    request({
-        Url = _G.Webhook,
-        Method = "POST",
-        Headers = {["Content-Type"] = "application/json"},
-        Body = HttpService:JSONEncode(payload)
-    })
-end
