@@ -31,15 +31,16 @@
     	Icon = "rbxassetid://120904195401721",
     	Position = "Right"
     })
----------------------------------------
 --==================================================
 -- SETTINGS
 --==================================================
 _G.AutoFarm = false
-_G.AboveHeight = 7
 _G.TweenSpeed = 180
 _G.AttackDelay = 0.001
 _G.HoldFTime = 2
+
+_G.FlyPosition = "Above"      -- Above / Below
+_G.DistanceFromEnemy = 25     -- ระยะจากมอน
 
 --==================================================
 -- SERVICES
@@ -49,7 +50,6 @@ local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local GuiService = game:GetService("GuiService")
-local RunService = game:GetService("RunService")
 
 local Player = Players.LocalPlayer
 
@@ -63,11 +63,14 @@ local function NormalAttack()
             "\002"
         }
     }
-    ReplicatedStorage:WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+    ReplicatedStorage
+        :WaitForChild("BridgeNet2")
+        :WaitForChild("dataRemoteEvent")
+        :FireServer(unpack(args))
 end
 
 --==================================================
--- GET LEVEL (ดึงเลขจริง)
+-- GET LEVEL
 --==================================================
 local function GetLevel()
     local gui = Player.PlayerGui:WaitForChild("HUD")
@@ -80,12 +83,12 @@ end
 --==================================================
 local QuestTable = {
     {1, 49,   "QuestGiver (Lv.1-Lv.50)",   "Human"},
-    {50, 149, "QuestGiver (Lv.50-Lv.150)", "Rank 2 Investigator"},
-    {150, 249,"QuestGiver (Lv.150-Lv.250)","Bulk Ghoul"},
-    {250, 349,"QuestGiver (Lv.250-Lv.350)","Rank 1 Investigator"},
-    {350, 399,"QuestGiver (Lv.350-Lv.400)","Serpent Ghoul"},
-    {400, 449,"QuestGiver (Lv.400-Lv.450)","Rin Ghoul"},
-    {450, 500,"QuestGiver (Lv.450-Lv.500)","First class Investigator"},
+    {50,149,  "QuestGiver (Lv.50-Lv.150)", "Rank 2 Investigator"},
+    {150,249, "QuestGiver (Lv.150-Lv.250)","Bulk Ghoul"},
+    {250,349, "QuestGiver (Lv.250-Lv.350)","Rank 1 Investigator"},
+    {350,399, "QuestGiver (Lv.350-Lv.400)","Serpent Ghoul"},
+    {400,449, "QuestGiver (Lv.400-Lv.450)","Rin Ghoul"},
+    {450,500, "QuestGiver (Lv.450-Lv.500)","First class Investigator"},
 }
 
 local function GetQuestData()
@@ -98,7 +101,7 @@ local function GetQuestData()
 end
 
 --==================================================
--- CHECK QUEST ACTIVE
+-- CHECK QUEST
 --==================================================
 local function HasQuest()
     local gui = Player.PlayerGui:FindFirstChild("Quest", true)
@@ -106,11 +109,12 @@ local function HasQuest()
 end
 
 --==================================================
--- SMOOTH TWEEN
+-- TWEEN MOVE
 --==================================================
 local function TweenTo(cf)
     local char = Player.Character
     if not char then return end
+
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
@@ -149,35 +153,39 @@ local function AcceptQuest(questName)
                 if (label and label.Text:find("Understood"))
                 or (v:IsA("TextButton") and v.Text:find("Understood")) then
                     GuiService.SelectedObject = v
-                    task.wait(0.005)
+                    task.wait()
                     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-                    task.wait(0.005)
+                    task.wait()
                     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
                     break
                 end
             end
         end
-
         task.wait(0.1)
     until HasQuest() or not _G.AutoFarm
 end
 
 --==================================================
--- TP ABOVE ENEMY
+-- TP TO ENEMY (บน / ล่าง + ระยะ)
 --==================================================
-local function TPAbove(enemyHRP)
+local function TPToEnemy(enemyHRP)
     local char = Player.Character
     if not char then return end
 
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChild("Humanoid")
-    if not hrp or not hum or not enemyHRP then return end
+    if not hrp or not hum then return end
 
     hum:ChangeState(Enum.HumanoidStateType.Physics)
     hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
 
-    local pos = enemyHRP.Position + Vector3.new(0, _G.AboveHeight, 0)
+    local y = _G.DistanceFromEnemy
+    if _G.FlyPosition == "Below" then
+        y = -_G.DistanceFromEnemy
+    end
+
+    local pos = enemyHRP.Position + Vector3.new(0, y, 0)
     hrp.CFrame = CFrame.lookAt(pos, enemyHRP.Position)
 end
 
@@ -196,7 +204,7 @@ local function FindEnemy(name)
 end
 
 --==================================================
--- MAIN LOOP (RUN ONCE)
+-- MAIN LOOP
 --==================================================
 task.spawn(function()
     while task.wait(0.25) do
@@ -214,31 +222,44 @@ task.spawn(function()
         if enemy then
             repeat
                 if not _G.AutoFarm then break end
-                task.wait(_G.AttackDelay)
-                TPAbove(enemy.HumanoidRootPart)
+                TPToEnemy(enemy.HumanoidRootPart)
                 NormalAttack()
+                task.wait(_G.AttackDelay)
             until enemy.Humanoid.Health <= 0 or not enemy.Parent
         end
     end
 end)
 
 --==================================================
--- UI TOGGLE
+-- UI (Dropdown + Slider อยู่บนสุด)
 --==================================================
-Section:NewToggle({
-    Title = "Auto Farm",
-    Default = false,    
-    Callback = function(tr)
-        _G.AutoFarm = tr
-
-        if not tr then
-            local char = Player.Character
-            if char and char:FindFirstChild("Humanoid") then
-                char.Humanoid:ChangeState(Enum.HumanoidStateType.Running)
-            end
-        end
+Section:NewDropdown({
+    Title = "Position",
+    Data = {"Above", "Below"},
+    Default = "Above",
+    Callback = function(v)
+        _G.FlyPosition = v
     end,
 })
+
+Section:NewSlider({
+    Title = "Distance",
+    Min = 1,
+    Max = 100,
+    Default = 10,
+    Callback = function(v)
+        _G.DistanceFromEnemy = v
+    end,
+})
+
+Section:NewToggle({
+    Title = "Auto Farm",
+    Default = false,
+    Callback = function(v)
+        _G.AutoFarm = v
+    end,
+})
+
 --------------------------------    
     Section:NewToggle({
     	Title = "Auto Use Waepon",
@@ -274,9 +295,211 @@ Section:NewToggle({
     	Position = "Left"
     })
 ---------------------------------------------
+--==================================================
+-- SERVICES
+--==================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+
+--==================================================
+-- LOCAL STATE (ไม่ใช้ _G)
+--==================================================
+local AutoFarmEnabled = false
+local FollowConnection = nil
+local AttackConnection = nil
+
+local SelectedBoss = "Kaneki"
+local DistanceBelowBoss = 10
+
+--==================================================
+-- REMOTE ATTACK
+--==================================================
+local attackRemote =
+	ReplicatedStorage:WaitForChild("BridgeNet2")
+	:WaitForChild("dataRemoteEvent")
+
+local attackArgs = {
+	{
+		"NormalAttack",
+		"\002"
+	}
+}
+
+--==================================================
+-- UTILS
+--==================================================
+local function getRoot(obj)
+	if not obj then return nil end
+	if obj:IsA("Model") then
+		return obj:FindFirstChild("HumanoidRootPart")
+			or obj:FindFirstChild("Torso")
+			or obj:FindFirstChild("UpperTorso")
+	elseif obj:IsA("BasePart") then
+		return obj
+	end
+	return nil
+end
+
+local function getCharRoot()
+	return getRoot(char)
+end
+
+--==================================================
+-- BOSS FOLDER
+--==================================================
+local bossFolder = workspace:WaitForChild("AI/Player"):WaitForChild("Boss")
+
+--==================================================
+-- FIND BOSS (เพิ่ม NORO)
+--==================================================
+local function findBoss()
+	for _, v in ipairs(bossFolder:GetChildren()) do
+		-- Kaneki
+		if SelectedBoss == "Kaneki" and v.Name == "Kaneki" then
+			return v
+		end
+
+		-- Jason*
+		if SelectedBoss == "Jason" and string.sub(v.Name, 1, 5) == "Jason" then
+			return v
+		end
+
+		-- Noro*
+		if SelectedBoss == "Noro" and string.sub(v.Name, 1, 4) == "Noro" then
+			return v
+		end
+
+		-- GiftBox (Part)
+		if SelectedBoss == "GiftBox" and v.Name == "GiftBox" then
+			return v
+		end
+	end
+	return nil
+end
+
+--==================================================
+-- STOP ALL
+--==================================================
+local function stopAll()
+	if FollowConnection then
+		FollowConnection:Disconnect()
+		FollowConnection = nil
+	end
+	if AttackConnection then
+		AttackConnection:Disconnect()
+		AttackConnection = nil
+	end
+end
+
+--==================================================
+-- START ATTACK LOOP
+--==================================================
+local function startAttack()
+	if AttackConnection then
+		AttackConnection:Disconnect()
+	end
+
+	AttackConnection = RunService.Heartbeat:Connect(function()
+		if not AutoFarmEnabled then return end
+		pcall(function()
+			attackRemote:FireServer(unpack(attackArgs))
+		end)
+	end)
+end
+
+--==================================================
+-- START FOLLOW (อยู่ใต้บอสเท่านั้น)
+--==================================================
+local function startFollow()
+	stopAll()
+	if not AutoFarmEnabled then return end
+
+	local SMOOTHING = 0.25
+	local boss = nil
+	local bossRoot = nil
+
+	FollowConnection = RunService.Heartbeat:Connect(function()
+		if not AutoFarmEnabled then return end
+
+		local hrp = getCharRoot()
+		if not hrp then return end
+
+		-- หา boss แบบ realtime
+		if not boss or not boss.Parent then
+			boss = findBoss()
+			if not boss then return end
+			bossRoot = getRoot(boss)
+			if not bossRoot then return end
+		end
+
+		-- ใต้บอสตรง ๆ
+		local targetPos =
+			bossRoot.Position
+			- Vector3.new(0, DistanceBelowBoss, 0)
+
+		local cf = CFrame.new(targetPos, bossRoot.Position)
+		hrp.CFrame = hrp.CFrame:Lerp(cf, SMOOTHING)
+	end)
+
+	startAttack()
+end
+
+--==================================================
+-- RESPAWN FIX
+--==================================================
+player.CharacterAdded:Connect(function(newChar)
+	char = newChar
+	newChar:WaitForChild("HumanoidRootPart", 10)
+
+	if AutoFarmEnabled then
+		task.wait(0.4)
+		startFollow()
+	end
+end)
+
+--==================================================
+-- UI
+--==================================================
+Section:NewDropdown({
+	Title = "Boss",
+	Data = {"Kaneki", "Jason", "Noro", "GiftBox"},
+	Default = 1,
+	Callback = function(v)
+		SelectedBoss = v
+		if AutoFarmEnabled then
+			startFollow()
+		end
+	end,
+})
+
+Section:NewToggle({
+	Title = "Auto Farm",
+	Default = false,
+	Callback = function(v)
+		AutoFarmEnabled = v
+		if v then
+			startFollow()
+		else
+			stopAll()
+		end
+	end,
+})
+
+Section:NewSlider({
+	Title = "Distance (Below Boss)",
+	Min = 1,
+	Max = 50,
+	Default = 10,
+	Callback = function(v)
+		DistanceBelowBoss = v
+	end,
+})
     
-----------------------------
+----------------------------------------------
     InfoSection:NewTitle('Join Discord')
     InfoSection:NewButton({
     
@@ -1133,6 +1356,148 @@ workspace.DescendantAdded:Connect(function(obj)
 end)
 
 print("[BoosFPS]")
+	end,
+})
+--==================================================
+-- SECTION
+--==================================================
+
+local Section = TabFrame:NewSection({
+	Title = "Anti Dev/Admin",
+	Icon = "rbxassetid://7743869054",
+	Position = "Left"
+})
+
+--==================================================
+-- SETTINGS
+--==================================================
+
+local BlacklistUserIds = {
+    4237831067,
+    4773106771,
+    451367976,
+    669857001,
+    3232600111,
+    1892202467,
+    9678111378,
+    1529242348,
+    2525819438,
+}
+
+_G.AntiAdmin = false
+_G.AntiAdminMode = 1 -- 1=Rejoin | 2=Kick | 3=Hop
+
+--==================================================
+-- SERVICES
+--==================================================
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlaceId = game.PlaceId
+
+--==================================================
+-- FUNCTIONS
+--==================================================
+
+local function IsBlacklisted(player)
+	for _, id in ipairs(BlacklistUserIds) do
+		if player.UserId == id then
+			return true
+		end
+	end
+	return false
+end
+
+local function Rejoin()
+	TeleportService:Teleport(PlaceId, LocalPlayer)
+end
+
+local function KickSelf()
+	LocalPlayer:Kick("Detected Dev/Admin in server")
+end
+
+local function HopServer()
+	local servers = {}
+	local req = game:HttpGet(
+		"https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+	)
+	local data = HttpService:JSONDecode(req)
+
+	for _, v in pairs(data.data) do
+		if v.playing < v.maxPlayers then
+			table.insert(servers, v.id)
+		end
+	end
+
+	if #servers > 0 then
+		TeleportService:TeleportToPlaceInstance(
+			PlaceId,
+			servers[math.random(1, #servers)],
+			LocalPlayer
+		)
+	else
+		Rejoin()
+	end
+end
+
+local function DoAction()
+	if _G.AntiAdminMode == 1 then
+		Rejoin()
+	elseif _G.AntiAdminMode == 2 then
+		KickSelf()
+	elseif _G.AntiAdminMode == 3 then
+		HopServer()
+	end
+end
+
+--==================================================
+-- CHECK LOOP
+--==================================================
+
+task.spawn(function()
+	while task.wait(1) do
+		if _G.AntiAdmin then
+			for _, plr in ipairs(Players:GetPlayers()) do
+				if plr ~= LocalPlayer and IsBlacklisted(plr) then
+					DoAction()
+					return
+				end
+			end
+		end
+	end
+end)
+
+Players.PlayerAdded:Connect(function(plr)
+	if _G.AntiAdmin and IsBlacklisted(plr) then
+		DoAction()
+	end
+end)
+
+--==================================================
+-- UI
+--==================================================
+
+Section:NewToggle({
+	Title = "Enable Anti Dev/Admin",
+	Default = false,
+	Callback = function(tr)
+		_G.AntiAdmin = tr
+	end,
+})
+
+Section:NewDropdown({
+	Title = "Action Mode",
+	Data = {
+		"Rejoin Server",
+		"Kick Self",
+		"Hop Server"
+	},
+	Default = nill,
+	Callback = function(a)
+		_G.AntiAdminMode = a
 	end,
 })
 ----------------------------------------------------------------------
