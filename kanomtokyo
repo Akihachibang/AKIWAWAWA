@@ -40,7 +40,7 @@ _G.AttackDelay = 0.001
 _G.HoldFTime = 2
 
 _G.FlyPosition = "Above"      -- Above / Below
-_G.DistanceFromEnemy = 25     -- ระยะจากมอน
+_G.DistanceFromEnemy = 10     -- ระยะจากมอน
 
 --==================================================
 -- SERVICES
@@ -60,7 +60,7 @@ local function NormalAttack()
     local args = {
         {
             "NormalAttack",
-            "\002"
+            "\n"
         }
     }
     ReplicatedStorage
@@ -325,7 +325,7 @@ local attackRemote =
 local attackArgs = {
 	{
 		"NormalAttack",
-		"\002"
+		"\n"
 	}
 }
 
@@ -741,7 +741,7 @@ local function NormalAttack()
     local args = {
         {
             "NormalAttack",
-            "\002"
+            "\n"
         }
     }
     ReplicatedStorage:WaitForChild("BridgeNet2")
@@ -884,7 +884,7 @@ local function NormalAttack()
     local args = {
         {
             "NormalAttack",
-            "\002"
+            "\n"
         }
     }
     ReplicatedStorage:WaitForChild("BridgeNet2")
