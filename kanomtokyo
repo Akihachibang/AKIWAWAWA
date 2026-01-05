@@ -31,7 +31,7 @@
     	Icon = "rbxassetid://120904195401721",
     	Position = "Right"
     })
---==================================================
+    --==================================================
 -- SETTINGS
 --==================================================
 _G.AutoFarm = false
@@ -70,12 +70,17 @@ local function NormalAttack()
 end
 
 --==================================================
--- GET LEVEL
+-- GET LEVEL (จาก Data.Level)
 --==================================================
 local function GetLevel()
-    local gui = Player.PlayerGui:WaitForChild("HUD")
-    local txt = gui.Container.Profile.Stats.Level.Main.Level.Text
-    return tonumber(txt:match("%d+")) or 1
+    local success, level = pcall(function()
+        return Player:WaitForChild("Data"):WaitForChild("Level").Value
+    end)
+    if success and type(level) == "number" then
+        return level
+    else
+        return 1
+    end
 end
 
 --==================================================
@@ -91,6 +96,9 @@ local QuestTable = {
     {450,500, "QuestGiver (Lv.450-Lv.500)","First class Investigator"},
 }
 
+--==================================================
+-- GET QUEST DATA
+--==================================================
 local function GetQuestData()
     local lv = GetLevel()
     for _, q in ipairs(QuestTable) do
@@ -127,7 +135,7 @@ local function TweenTo(cf)
 end
 
 --==================================================
--- ACCEPT QUEST (กด F ครั้งเดียวแต่เร็ว)
+-- ACCEPT QUEST (กด F ครั้งเดียวเร็ว)
 --==================================================
 local function AcceptQuest(questName)
     local npc = workspace.TalkNpc.QuestGiver:FindFirstChild(questName)
@@ -167,7 +175,7 @@ local function AcceptQuest(questName)
 end
 
 --==================================================
--- TP TO ENEMY (บน / ล่าง + ระยะ)
+-- TP TO ENEMY
 --==================================================
 local function TPToEnemy(enemyHRP)
     local char = Player.Character
@@ -191,7 +199,7 @@ local function TPToEnemy(enemyHRP)
 end
 
 --==================================================
--- FIND ENEMY
+-- FIND ENEMY (ใช้ชื่อตรง ๆ)
 --==================================================
 local function FindEnemy(name)
     for _, v in ipairs(workspace:GetDescendants()) do
@@ -205,7 +213,7 @@ local function FindEnemy(name)
 end
 
 --==================================================
--- MAIN LOOP (ฟาร์มหลายตัว + ตรวจสอบ enemyNames ปลอดภัย)
+-- MAIN LOOP
 --==================================================
 task.spawn(function()
     while task.wait(0.25) do
@@ -219,12 +227,12 @@ task.spawn(function()
             continue
         end
 
-        -- สร้างตาราง enemiesToFarm และตรวจสอบ type
+        -- แยกชื่อมอนเป็นตาราง ป้องกัน nil
         local enemiesToFarm = {}
         if type(enemyNames) == "string" and enemyNames ~= "" then
             for name in string.gmatch(enemyNames, "[^,]+") do
                 if type(name) == "string" then
-                    local cleanName = name:gsub("%s+", "")
+                    local cleanName = name:gsub("^%s*(.-)%s*$", "%1") -- trim เว้นวรรคหน้า/หลัง
                     if cleanName ~= "" then
                         table.insert(enemiesToFarm, cleanName)
                     end
@@ -248,7 +256,7 @@ task.spawn(function()
 end)
 
 --==================================================
--- UI (Dropdown + Slider + Toggle)
+-- UI (Dropdown / Slider / Toggle)
 --==================================================
 Section:NewDropdown({
     Title = "Position",
@@ -300,8 +308,7 @@ Section:NewToggle({
         end)
     end,
 })
-
----ฆ่าบอส
+----ฆ่าบอส
     local Section = TabFrame:NewSection({
     	Title = "Boss Target",
     	Icon = "rbxassetid://7743869054",
