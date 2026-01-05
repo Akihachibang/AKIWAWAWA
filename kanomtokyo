@@ -720,7 +720,6 @@ local Section = TabFrame:NewSection({
 _G.Distance = 10          -- ระยะห่างใต้มอน (ปรับจาก Slider)
 local ATTACK_DELAY = 0.001
 
--- รายชื่อมอนเตอร์ (ลบ Jason ออกแล้ว)
 local MONSTERS = {
     "Bulk Ghoul",
     "First class Investigator",
@@ -836,7 +835,7 @@ Section:NewDropdown({
 
 -- ================== UI Slider (ปรับระยะใต้มอน) ====================
 Section:NewSlider({
-    Title = "Distance",
+    Title = "Distance Monster",
     Min = 1,
     Max = 50,
     Default = 10,
@@ -848,7 +847,7 @@ Section:NewSlider({
 
 -- ================== UI Toggle ====================
 Section:NewToggle({
-    Title = "Auto Farm",
+    Title = "Auto Farm Monster",
     Default = false,
     Callback = function(tr)
         _G.AutoFarmRunning = tr
@@ -859,7 +858,141 @@ Section:NewToggle({
         end
     end,
 })
+-- ================== CONFIG ==========================
+_G.Distance = 10
+local ATTACK_DELAY = 0.001
 
+-- รายชื่อมอนเตอร์ (ไม่มี Jason)
+local MONSTERS = {
+    "Bulk Ghoul",
+    "First class Investigator",
+    "Rank 1 Investigator",
+    "Rank 2 Investigator",
+    "Rin Ghoul",
+    "Serpent Ghoul",
+    "Athlete",
+    "Human"
+}
+
+-- ================== SERVICES ========================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Player = Players.LocalPlayer
+
+-- ================== ATTACK REMOTE =====================
+local function NormalAttack()
+    local args = {
+        {
+            "NormalAttack",
+            "\002"
+        }
+    }
+    ReplicatedStorage:WaitForChild("BridgeNet2")
+        :WaitForChild("dataRemoteEvent")
+        :FireServer(unpack(args))
+end
+
+-- ================== FIND CLOSEST ENEMY =========================
+local function FindEnemyByName(name)
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+
+    local closest, shortest = nil, math.huge
+
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model")
+        and v.Name == name
+        and v:FindFirstChild("Humanoid")
+        and v:FindFirstChild("HumanoidRootPart")
+        and v.Humanoid.Health > 0 then
+
+            local dist = (v.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+            if dist < shortest then
+                shortest = dist
+                closest = v
+            end
+        end
+    end
+
+    return closest
+end
+
+-- ================== TP ใต้มอน ====================
+local function TPUnder(enemyHRP)
+    local char = Player.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChild("Humanoid")
+    if not hrp or not hum then return end
+
+    hum:ChangeState(Enum.HumanoidStateType.Physics)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+
+    hrp.CFrame = CFrame.lookAt(
+        enemyHRP.Position - Vector3.new(0, _G.Distance, 0),
+        enemyHRP.Position
+    )
+end
+
+-- ================== MAIN LOOP ==========================
+_G.AutoFarmRunning = false
+
+task.spawn(function()
+    while true do
+        task.wait(0.3)
+
+        if not _G.AutoFarmRunning then
+            continue
+        end
+
+        -- ไล่ทีละชื่อมอน
+        for _, monsterName in ipairs(MONSTERS) do
+            if not _G.AutoFarmRunning then break end
+
+            local enemy = FindEnemyByName(monsterName)
+            if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+
+                -- ตีจนกว่ามอนตัวนี้จะตาย
+                repeat
+                    if not _G.AutoFarmRunning then break end
+                    task.wait(ATTACK_DELAY)
+
+                    if not enemy.Parent or enemy.Humanoid.Health <= 0 then
+                        break
+                    end
+
+                    TPUnder(enemy.HumanoidRootPart)
+                    NormalAttack()
+
+                until false
+            end
+        end
+    end
+end)
+
+-- ================== UI Slider ====================
+Section:NewSlider({
+    Title = "Distance All Monster",
+    Min = 1,
+    Max = 50,
+    Default = 10,
+    Callback = function(v)
+        _G.Distance = v
+        print("Distance:", v)
+    end,
+})
+
+-- ================== UI Toggle ====================
+Section:NewToggle({
+    Title = "Farm All Monster",
+    Default = false,
+    Callback = function(state)
+        _G.AutoFarmRunning = state
+        print(state and "✅ Auto Farm : ON" or "⛔ Auto Farm : OFF")
+    end,
+})
 ---tap2จุดวาป
     local TabFrame = Windows:NewTab({
     	Title = "Teleport",
@@ -957,8 +1090,6 @@ Section:NewToggle({
     
     	end,
     })
----Shop
----ขี้เกียจทำ
 ---Setting
     local TabFrame = Windows:NewTab({
     	Title = "Setting",
