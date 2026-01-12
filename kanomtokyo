@@ -464,12 +464,13 @@ Log("Current Level: " .. tostring(GetLevel()))
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
 
 --==================================================
--- LOCAL STATE (ไม่ใช้ _G)
+-- LOCAL STATE
 --==================================================
 local AutoFarmEnabled = false
 local FollowConnection = nil
@@ -477,6 +478,7 @@ local AttackConnection = nil
 
 local SelectedBoss = "Kaneki"
 local DistanceBelowBoss = 10
+local TweenSpeed = 180 -- speed ของ tween
 
 --==================================================
 -- REMOTE ATTACK
@@ -488,7 +490,7 @@ local attackRemote =
 local attackArgs = {
 	{
 		"NormalAttack",
-		"\n"
+		"\r"
 	}
 }
 
@@ -517,26 +519,19 @@ end
 local bossFolder = workspace:WaitForChild("AI/Player"):WaitForChild("Boss")
 
 --==================================================
--- FIND BOSS (เพิ่ม NORO)
+-- FIND BOSS
 --==================================================
 local function findBoss()
 	for _, v in ipairs(bossFolder:GetChildren()) do
-		-- Kaneki
 		if SelectedBoss == "Kaneki" and v.Name == "Kaneki" then
 			return v
 		end
-
-		-- Jason*
 		if SelectedBoss == "Jason" and string.sub(v.Name, 1, 5) == "Jason" then
 			return v
 		end
-
-		-- Noro*
 		if SelectedBoss == "Noro" and string.sub(v.Name, 1, 4) == "Noro" then
 			return v
 		end
-
-		-- GiftBox (Part)
 		if SelectedBoss == "GiftBox" and v.Name == "GiftBox" then
 			return v
 		end
@@ -575,15 +570,26 @@ local function startAttack()
 end
 
 --==================================================
--- START FOLLOW (อยู่ใต้บอสเท่านั้น)
+-- START FOLLOW (ใช้ Tween)
 --==================================================
 local function startFollow()
 	stopAll()
 	if not AutoFarmEnabled then return end
 
-	local SMOOTHING = 0.25
 	local boss = nil
 	local bossRoot = nil
+	local platformPart = nil
+
+	-- สร้าง platform ใต้ตัวละครเพื่อวาง Tween
+	if not platformPart or not platformPart.Parent then
+		platformPart = Instance.new("Part")
+		platformPart.Name = "TweenPlatform"
+		platformPart.Size = Vector3.new(10,1,10)
+		platformPart.Anchored = true
+		platformPart.Transparency = 1
+		platformPart.CanCollide = true
+		platformPart.Parent = workspace
+	end
 
 	FollowConnection = RunService.Heartbeat:Connect(function()
 		if not AutoFarmEnabled then return end
@@ -599,13 +605,19 @@ local function startFollow()
 			if not bossRoot then return end
 		end
 
-		-- ใต้บอสตรง ๆ
-		local targetPos =
-			bossRoot.Position
-			- Vector3.new(0, DistanceBelowBoss, 0)
+		-- คำนวณตำแหน่งเป้าหมาย (ใต้บอส)
+		local targetPos = bossRoot.Position - Vector3.new(0, DistanceBelowBoss, 0)
 
-		local cf = CFrame.new(targetPos, bossRoot.Position)
-		hrp.CFrame = hrp.CFrame:Lerp(cf, SMOOTHING)
+		-- tween ตัวละครไปยังตำแหน่งเป้าหมาย
+		local dist = (hrp.Position - targetPos).Magnitude
+		if dist > 1 then
+			local tweenInfo = TweenInfo.new(dist / TweenSpeed, Enum.EasingStyle.Linear)
+			local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos, bossRoot.Position)})
+			tween:Play()
+		end
+
+		-- เคลื่อน platform ตามตัวละคร
+		platformPart.CFrame = CFrame.new(targetPos.X, targetPos.Y - 3, targetPos.Z)
 	end)
 
 	startAttack()
@@ -659,6 +671,16 @@ Section:NewSlider({
 	Default = 10,
 	Callback = function(v)
 		DistanceBelowBoss = v
+	end,
+})
+
+Section:NewSlider({
+	Title = "Tween Speed",
+	Min = 50,
+	Max = 500,
+	Default = TweenSpeed,
+	Callback = function(v)
+		TweenSpeed = v
 	end,
 })
     
@@ -855,7 +877,7 @@ Section:NewSlider({
     Title = "Amount",
     Min = 1,
     Max = 50,
-    Default = 25,
+    Default = 3,
     Callback = function(a)
         autoValues.Amount = a
     end,
@@ -882,8 +904,9 @@ local Section = TabFrame:NewSection({
 -- ================== CONFIG ==========================
 local Distance = 10
 local AutoFarmRunning = false
-local SelectedMonster = nil
 local ATTACK_DELAY = 0.001
+local TweenSpeed = 180 -- ความเร็ว Tween
+local SelectedMonster = nil
 
 local MONSTERS = {
     "Bulk Ghoul",
@@ -899,145 +922,13 @@ local MONSTERS = {
 -- ================== SERVICES ========================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local Player = Players.LocalPlayer
 
 -- ================== ATTACK REMOTE ===================
 local function NormalAttack()
-    ReplicatedStorage
-        :WaitForChild("BridgeNet2")
-        :WaitForChild("dataRemoteEvent")
-        :FireServer({
-            "NormalAttack",
-            "\n"
-        })
-end
-
--- ================== FIND ENEMY (ล็อคตัวแรกที่เจอ) =========
-local function FindEnemy(name)
-    for _, v in ipairs(workspace:GetDescendants()) do
-        if v:IsA("Model")
-        and v.Name == name
-        and v:FindFirstChild("Humanoid")
-        and v:FindFirstChild("HumanoidRootPart")
-        and v.Humanoid.Health > 0 then
-            return v
-        end
-    end
-    return nil
-end
-
--- ================== TP ใต้มอน =====================
-local function TPUnder(enemyHRP)
-    local char = Player.Character
-    if not char then return end
-
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChild("Humanoid")
-    if not hrp or not hum then return end
-
-    -- ป้องกันชนสคริปต์อื่น
-    if hum:GetState() ~= Enum.HumanoidStateType.Physics then
-        hum:ChangeState(Enum.HumanoidStateType.Physics)
-    end
-
-    hrp.AssemblyLinearVelocity = Vector3.zero
-    hrp.AssemblyAngularVelocity = Vector3.zero
-
-    hrp.CFrame = CFrame.lookAt(
-        enemyHRP.Position - Vector3.new(0, Distance, 0),
-        enemyHRP.Position
-    )
-end
-
--- ================== MAIN SYSTEM ======================
-local CurrentEnemy = nil
-local Heartbeat = game:GetService("RunService").Heartbeat
-
-Heartbeat:Connect(function()
-    if not AutoFarmRunning then
-        CurrentEnemy = nil
-        return
-    end
-
-    -- หาเป้าใหม่เฉพาะตอนจำเป็น
-    if not CurrentEnemy
-    or not CurrentEnemy.Parent
-    or CurrentEnemy.Humanoid.Health <= 0 then
-        CurrentEnemy = FindEnemy(SelectedMonster)
-    end
-
-    -- ตีเฉพาะตัวที่ล็อค
-    if CurrentEnemy and CurrentEnemy:FindFirstChild("HumanoidRootPart") then
-        TPUnder(CurrentEnemy.HumanoidRootPart)
-        NormalAttack()
-        task.wait(ATTACK_DELAY)
-    end
-end)
-
--- ================== UI ==============================
-
-Section:NewDropdown({
-    Title = "Select Monster",
-    Data = MONSTERS,
-    Default = MONSTERS[1],
-    Callback = function(v)
-        SelectedMonster = v
-        CurrentEnemy = nil
-        print("🎯 Selected:", v)
-    end,
-})
-
-Section:NewSlider({
-    Title = "Distance Under Monster",
-    Min = 1,
-    Max = 50,
-    Default = 10,
-    Callback = function(v)
-        Distance = v
-    end,
-})
-
-Section:NewToggle({
-    Title = "Auto Farm Monster",
-    Default = false,
-    Callback = function(state)
-        AutoFarmRunning = state
-        if not state then
-            CurrentEnemy = nil
-            local char = Player.Character
-            if char and char:FindFirstChild("Humanoid") then
-                char.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-            end
-        end
-    end,
-})
--- ================== CONFIG ==========================
-_G.Distance = 10
-local ATTACK_DELAY = 0.001
-local MONSTERS = {
-    "Bulk Ghoul",
-    "First class Investigator",
-    "Rank 1 Investigator",
-    "Rank 2 Investigator",
-    "Rin Ghoul",
-    "Serpent Ghoul",
-    "Athlete",
-    "Human"
-}
-
--- ================== SERVICES ========================
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Player = Players.LocalPlayer
-
--- ================== ATTACK REMOTE =====================
-local function NormalAttack()
-    local args = {
-        {
-            "NormalAttack",
-            "\n"
-        }
-    }
+    local args = {{"NormalAttack","\r"}}
     ReplicatedStorage:WaitForChild("BridgeNet2")
         :WaitForChild("dataRemoteEvent")
         :FireServer(unpack(args))
@@ -1068,8 +959,17 @@ local function FindEnemyByName(name)
     return closest
 end
 
--- ================== TP ใต้มอน ====================
-local function TPUnder(enemyHRP)
+-- ================== CREATE PLATFORM ====================
+local platformPart = Instance.new("Part")
+platformPart.Name = "TweenPlatform"
+platformPart.Size = Vector3.new(10,1,10)
+platformPart.Anchored = true
+platformPart.Transparency = 1
+platformPart.CanCollide = true
+platformPart.Parent = workspace
+
+-- ================== TP ใต้มอนแบบ Tween ====================
+local function TweenUnder(enemyHRP)
     local char = Player.Character
     if not char then return end
 
@@ -1081,66 +981,78 @@ local function TPUnder(enemyHRP)
     hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
 
-    hrp.CFrame = CFrame.lookAt(
-        enemyHRP.Position - Vector3.new(0, _G.Distance, 0),
-        enemyHRP.Position
-    )
+    local targetPos = enemyHRP.Position - Vector3.new(0, Distance, 0)
+    local tweenTime = (hrp.Position - targetPos).Magnitude / TweenSpeed
+    local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear)
+    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos, enemyHRP.Position)})
+    tween:Play()
+
+    -- เคลื่อน platform ตาม
+    TweenService:Create(platformPart, tweenInfo, {CFrame = CFrame.new(targetPos.X, targetPos.Y - 3, targetPos.Z)}):Play()
 end
 
 -- ================== MAIN LOOP ==========================
-_G.AutoFarmRunning = false
-
 task.spawn(function()
     while true do
-        task.wait(0.3)
+        task.wait(0.2)
+        if not AutoFarmRunning then continue end
 
-        if not _G.AutoFarmRunning then
-            continue
-        end
-
-        -- ไล่ทีละชื่อมอน
         for _, monsterName in ipairs(MONSTERS) do
-            if not _G.AutoFarmRunning then break end
+            if not AutoFarmRunning then break end
 
             local enemy = FindEnemyByName(monsterName)
             if enemy and enemy:FindFirstChild("HumanoidRootPart") then
 
                 -- ตีจนกว่ามอนตัวนี้จะตาย
                 repeat
-                    if not _G.AutoFarmRunning then break end
+                    if not AutoFarmRunning then break end
                     task.wait(ATTACK_DELAY)
+                    if not enemy.Parent or enemy.Humanoid.Health <= 0 then break end
 
-                    if not enemy.Parent or enemy.Humanoid.Health <= 0 then
-                        break
-                    end
-
-                    TPUnder(enemy.HumanoidRootPart)
+                    TweenUnder(enemy.HumanoidRootPart)
                     NormalAttack()
-
                 until false
             end
         end
     end
 end)
 
--- ================== UI Slider ====================
-Section:NewSlider({
-    Title = "Distance All Monster",
-    Min = 1,
-    Max = 50,
-    Default = 10,
+-- ================== UI ==============================
+Section:NewDropdown({
+    Title = "Select Monster",
+    Data = MONSTERS,
+    Default = MONSTERS[1],
     Callback = function(v)
-        _G.Distance = v
-        print("Distance:", v)
+        SelectedMonster = v
+        print("🎯 Selected:", v)
     end,
 })
 
--- ================== UI Toggle ====================
+Section:NewSlider({
+    Title = "Distance Under Monster",
+    Min = 1,
+    Max = 50,
+    Default = Distance,
+    Callback = function(v)
+        Distance = v
+    end,
+})
+
+Section:NewSlider({
+    Title = "Tween Speed",
+    Min = 50,
+    Max = 500,
+    Default = TweenSpeed,
+    Callback = function(v)
+        TweenSpeed = v
+    end,
+})
+
 Section:NewToggle({
-    Title = "Farm All Monster",
+    Title = "Auto Farm Monster",
     Default = false,
     Callback = function(state)
-        _G.AutoFarmRunning = state
+        AutoFarmRunning = state
         print(state and "✅ Auto Farm : ON" or "⛔ Auto Farm : OFF")
     end,
 })
@@ -1156,91 +1068,57 @@ Section:NewToggle({
     	Icon = "rbxassetid://7743869054",
     	Position = "Left"
     })
-    Section:NewButton({
-    	Title = "Ccg Spawn",
-    	Callback = function()
-    		-- ดึงผู้เล่น
-    local player = game.Players.LocalPlayer
+-- ================== SERVICES ==========================
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
+-- ================== UTILS =============================
+local function TweenToPosition(targetPosition, speed)
+    local player = Players.LocalPlayer
     local character = player.Character or player.CharacterAdded:Wait()
     local hrp = character:WaitForChild("HumanoidRootPart")
-    
-    -- พิกัดที่ต้องการวาป
-    local targetPosition = Vector3.new(182, 6, -479)
-    
-    -- ฟังก์ชันวาป
-    local function teleport()
-        hrp.CFrame = CFrame.new(targetPosition)
-    end
-    
-    -- เรียกใช้ฟังก์ชันวาป
-    teleport()
-    	end,
-    })
-    
-    Section:NewButton({
-    	Title = "Cafe",
-    	Callback = function()
-    		-- ดึงผู้เล่น
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local hrp = character:WaitForChild("HumanoidRootPart")
-    
-    -- พิกัดที่ต้องการวาป
-    local targetPosition = Vector3.new(-107, 5, 206)
-    
-    -- ฟังก์ชันวาป
-    local function teleport()
-        hrp.CFrame = CFrame.new(targetPosition)
-    end
-    
-    -- เรียกใช้ฟังก์ชันวาป
-    teleport()
-    
-    	end,
-    })
-    Section:NewButton({
-    	Title = "Json",
-    	Callback = function()
-    		-- ดึงผู้เล่น
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local hrp = character:WaitForChild("HumanoidRootPart")
-    
-    -- พิกัดที่ต้องการวาป
-    local targetPosition = Vector3.new(-86, 5, -161)
-    
-    -- ฟังก์ชันวาป
-    local function teleport()
-        hrp.CFrame = CFrame.new(targetPosition)
-    end
-    
-    -- เรียกใช้ฟังก์ชันวาป
-    teleport()
-    
-    	end,
-    })
-    
-    Section:NewButton({
-    	Title = "Kaneki",
-    	Callback = function()
-    		-- ดึงผู้เล่น
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local hrp = character:WaitForChild("HumanoidRootPart")
-    
-    -- พิกัดที่ต้องการวาป
-    local targetPosition = Vector3.new(143, 5, 620)
-    
-    -- ฟังก์ชันวาป
-    local function teleport()
-        hrp.CFrame = CFrame.new(targetPosition)
-    end
-    
-    -- เรียกใช้ฟังก์ชันวาป
-    teleport()
-    
-    	end,
-    })
+
+    local dist = (hrp.Position - targetPosition).Magnitude
+    local tweenTime = dist / speed
+    local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear)
+    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPosition)})
+    tween:Play()
+end
+
+-- ================== BUTTONS ===========================
+local TWEEN_SPEED = 180 -- ความเร็วการวาป
+
+Section:NewButton({
+    Title = "Ccg Spawn",
+    Callback = function()
+        local targetPosition = Vector3.new(182, 6, -479)
+        TweenToPosition(targetPosition, TWEEN_SPEED)
+    end,
+})
+
+Section:NewButton({
+    Title = "Cafe",
+    Callback = function()
+        local targetPosition = Vector3.new(-107, 5, 206)
+        TweenToPosition(targetPosition, TWEEN_SPEED)
+    end,
+})
+
+Section:NewButton({
+    Title = "Json",
+    Callback = function()
+        local targetPosition = Vector3.new(-86, 5, -161)
+        TweenToPosition(targetPosition, TWEEN_SPEED)
+    end,
+})
+
+Section:NewButton({
+    Title = "Kaneki",
+    Callback = function()
+        local targetPosition = Vector3.new(143, 5, 620)
+        TweenToPosition(targetPosition, TWEEN_SPEED)
+    end,
+})
 -----WEBHOOK
     local TabFrame = Windows:NewTab({
 	    Title = "Webhook",
