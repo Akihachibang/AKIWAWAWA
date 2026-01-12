@@ -14,15 +14,15 @@
     	Title = "AKIHUB",
     	Description = "Kanom tokyo",
     	Keybind = Enum.KeyCode.RightControl,
-    	Logo = 'http://www.roblox.com/asset/?id=106070727897225'
+    	Logo = 'http://www.roblox.com/asset/?id=132859275883558'
     })
     local TabFrame = Windows:NewTab({
-    	Title = "Frame",
+    	Title = "Main",
     	Description = "Fram tab",
     	Icon = "rbxassetid://109805612001451"
     })
     local Section = TabFrame:NewSection({
-    	Title = "Fram Menu",
+    	Title = "Farm Menu",
     	Icon = "rbxassetid://7743869054",
     	Position = "Left"
     })
@@ -174,10 +174,21 @@ local function AcceptQuest(questName)
         if not _G.AutoFarm then return end
         TweenTo(npc.PrimaryPart.CFrame)
         task.wait(0.2)
+
+        -- กด F กับ NPC
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
         task.wait(2)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
 
+        -- กดคลิกซ้าย 2 ครั้ง หลัง F
+        for i = 1, 2 do
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)  -- กดลง
+            task.wait(0.05)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) -- ปล่อย
+            task.wait(0.01)
+        end
+
+        -- ตรวจสอบปุ่ม GUI "Understood"
         for _, v in ipairs(Player.PlayerGui:GetDescendants()) do
             if not _G.AutoFarm then return end
             if (v:IsA("TextButton") or v:IsA("ImageButton")) and v.Visible then
@@ -192,6 +203,7 @@ local function AcceptQuest(questName)
                 end
             end
         end
+
         task.wait(0.1)
     until HasQuest() or not _G.AutoFarm
 
@@ -199,6 +211,7 @@ local function AcceptQuest(questName)
         Log("Quest accepted successfully!")
     end
 end
+
 
 -- Platform Functions
 local currentTween = nil
@@ -903,10 +916,12 @@ local Section = TabFrame:NewSection({
 -------------------------------------------------------
 -- ================== CONFIG ==========================
 local Distance = 10
-local AutoFarmRunning = false
 local ATTACK_DELAY = 0.001
-local TweenSpeed = 180 -- ความเร็ว Tween
+local TweenSpeed = 180
 local SelectedMonster = nil
+local AutoFarmRunning = false
+local FarmAllRunning = false
+local NoclipEnabled = false
 
 local MONSTERS = {
     "Bulk Ghoul",
@@ -916,6 +931,8 @@ local MONSTERS = {
     "Rin Ghoul",
     "Serpent Ghoul",
     "Athlete",
+    "Akira",
+    "Aogiri",
     "Human"
 }
 
@@ -991,21 +1008,54 @@ local function TweenUnder(enemyHRP)
     TweenService:Create(platformPart, tweenInfo, {CFrame = CFrame.new(targetPos.X, targetPos.Y - 3, targetPos.Z)}):Play()
 end
 
--- ================== MAIN LOOP ==========================
+-- ================== NOCALIP ===========================
+RunService.Stepped:Connect(function()
+    if NoclipEnabled then
+        local char = Player.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+-- ================== AUTO FARM MONSTER ==================
 task.spawn(function()
     while true do
         task.wait(0.2)
         if not AutoFarmRunning then continue end
+        if not SelectedMonster then continue end
+        if FarmAllRunning then continue end -- หยุด AutoFarm ถ้า FarmAll กำลังทำงาน
+
+        local enemy = FindEnemyByName(SelectedMonster)
+        if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+            repeat
+                if not AutoFarmRunning or FarmAllRunning then break end
+                task.wait(ATTACK_DELAY)
+                if not enemy.Parent or enemy.Humanoid.Health <= 0 then break end
+
+                TweenUnder(enemy.HumanoidRootPart)
+                NormalAttack()
+            until false
+        end
+    end
+end)
+
+-- ================== FARM ALL MONSTERS ==================
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if not FarmAllRunning then continue end
 
         for _, monsterName in ipairs(MONSTERS) do
-            if not AutoFarmRunning then break end
-
+            if not FarmAllRunning then break end
             local enemy = FindEnemyByName(monsterName)
             if enemy and enemy:FindFirstChild("HumanoidRootPart") then
-
-                -- ตีจนกว่ามอนตัวนี้จะตาย
                 repeat
-                    if not AutoFarmRunning then break end
+                    if not FarmAllRunning then break end
                     task.wait(ATTACK_DELAY)
                     if not enemy.Parent or enemy.Humanoid.Health <= 0 then break end
 
@@ -1056,11 +1106,30 @@ Section:NewToggle({
         print(state and "✅ Auto Farm : ON" or "⛔ Auto Farm : OFF")
     end,
 })
+
+Section:NewToggle({
+    Title = "Noclip",
+    Default = false,
+    Callback = function(state)
+        NoclipEnabled = state
+        print(state and "👻 Noclip : ON" or "🚫 Noclip : OFF")
+    end,
+})
+
+Section:NewToggle({
+    Title = "Farm All",
+    Default = false,
+    Callback = function(state)
+        FarmAllRunning = state
+        print(state and "⚡ Farming All Monsters : ON" or "⛔ Farming All Monsters : OFF")
+    end,
+})
+
 -----------------------------------------------------------------------------------------tap2จุดวาป
     local TabFrame = Windows:NewTab({
     	Title = "Teleport",
     	Description = "Teleport To Savezone and Boss",
-    	Icon = "rbxassetid://7733960981"
+    	Icon = "rbxassetid://126437319037726"
     })
     
     local Section = TabFrame:NewSection({
@@ -1123,7 +1192,7 @@ Section:NewButton({
     local TabFrame = Windows:NewTab({
 	    Title = "Webhook",
 	    Description = "Webhook Tab",
-	    Icon = "rbxassetid://7733960981"
+	    Icon = "rbxassetid://94553780802594"
     })
     local Section = TabFrame:NewSection({
 	    Title = "Start",
@@ -1199,7 +1268,7 @@ Section:NewSlider({
     local TabFrame = Windows:NewTab({
     	Title = "Setting",
     	Description = "Setting tab",
-    	Icon = "rbxassetid://7733960981"
+    	Icon = "rbxassetid://127037527815611"
     })
     local Section = TabFrame:NewSection({
     	Title = "SelectTeam",
