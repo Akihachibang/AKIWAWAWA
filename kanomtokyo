@@ -8,14 +8,50 @@
 	--	╚═╝░░╚═╝╚═╝░░╚═╝╚═╝╚═╝░░╚═╝░╚═════╝░╚═════╝░
 	-- kanom tokyo
 -----------------------------------------------------------------------------------
+local startTime = tick()
 
-    local NothingLibrary = loadstring(game:HttpGetAsync('https://raw.githubusercontent.com/3345-c-a-t-s-u-s/NOTHING/main/source.lua'))();
-    local Windows = NothingLibrary.new({
-    	Title = "AKIHUB",
-    	Description = "Kanom tokyo",
-    	Keybind = Enum.KeyCode.RightControl,
-    	Logo = 'http://www.roblox.com/asset/?id=132859275883558'
-    })
+local NothingLibrary = loadstring(game:HttpGetAsync(
+    'https://raw.githubusercontent.com/3345-c-a-t-s-u-s/NOTHING/main/source.lua'
+))()
+
+local Windows = NothingLibrary.new({
+    Title = "AKIHUB",
+    Description = "Kanom tokyo : กำลังโหลดเวลา...",
+    Keybind = Enum.KeyCode.RightControl,
+    Logo = 'http://www.roblox.com/asset/?id=132859275883558'
+})
+
+-- รอ UI โหลด
+task.wait(1)
+
+-- หา TextLabel ของ Description
+local function findDescriptionLabel()
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("TextLabel") and string.find(v.Text, "Kanom tokyo") then
+            return v
+        end
+    end
+end
+
+local descLabel = findDescriptionLabel()
+
+task.spawn(function()
+    while true do
+        if descLabel then
+            local elapsed = math.floor(tick() - startTime)
+
+            local hours = math.floor(elapsed / 3600)
+            local minutes = math.floor((elapsed % 3600) / 60)
+            local seconds = elapsed % 60
+
+            local timeText = string.format("%02d:%02d:%02d", hours, minutes, seconds)
+
+            descLabel.Text = "Kanom tokyo : PlayTime " .. timeText
+        end
+        task.wait(1)
+    end
+end)
+
     local TabFrame = Windows:NewTab({
     	Title = "Main",
     	Description = "Fram tab",
