@@ -1,0 +1,199 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local player = Players.LocalPlayer
+
+--// 1. ปรับปรุง Anti-AFK ให้เสถียรขึ้น
+player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+local startTime = tick()
+
+--// 2. แก้ HttpGetAsync เป็น HttpGet เพื่อความชัวร์
+local NothingLibrary = loadstring(game:HttpGet(
+    'https://raw.githubusercontent.com/3345-c-a-t-s-u-s/NOTHING/main/source.lua'
+))()
+
+local Windows = NothingLibrary.new({
+    Title = "AKIHUB",
+    Description = "ONE BLOCK: กำลังโหลดเวลา...",
+    Keybind = Enum.KeyCode.RightControl,
+    Logo = 'http://www.roblox.com/asset/?id=132859275883558'
+})
+
+--// ฟังก์ชันหา Description Label
+local function findDescriptionLabel()
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("TextLabel") and string.find(v.Text, "ONE BLOCK") then
+            return v
+        end
+    end
+end
+
+--// รอจนกว่าจะเจอ Label (เพิ่ม timeout กันค้าง)
+local descLabel
+task.spawn(function()
+    local retryCount = 0
+    repeat
+        descLabel = findDescriptionLabel()
+        task.wait(1)
+        retryCount = retryCount + 1
+    until descLabel or retryCount > 60 -- หยุดหาถ้าผ่านไป 60 วิ
+end)
+
+--// อัปเดตเวลา
+task.spawn(function()
+    while true do
+        if descLabel then
+            local elapsed = math.floor(tick() - startTime)
+            local hours = math.floor(elapsed / 3600)
+            local minutes = math.floor((elapsed % 3600) / 60)
+            local seconds = elapsed % 60
+            local timeText = string.format("%02d:%02d:%02d", hours, minutes, seconds)
+            descLabel.Text = "ONE BLOCK : PlayTime " .. timeText
+        end
+        task.wait(1)
+    end
+end)
+
+local TabFrame = Windows:NewTab({
+    Title = "Main",
+    Description = "Main tab",
+    Icon = "rbxassetid://80313090537874"
+})
+
+--// 3. แยกชื่อตัวแปร Section เพื่อป้องกันความสับสน
+local MoneySection = TabFrame:NewSection({
+    Title = "Money",
+    Icon = "rbxassetid://80483548260042",
+    Position = "Left"
+})
+
+local InfoSection = TabFrame:NewSection({
+    Title = "Information",
+    Icon = "rbxassetid://7733964719",
+    Position = "Right"
+})
+
+InfoSection:NewTitle('Join Discord')
+InfoSection:NewButton({
+    Title = "Discord",
+    Callback = function()
+        local textToCopy = "https://discord.gg/NeGv59fYEd"
+        if setclipboard then
+            setclipboard(textToCopy)
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "คัดลอกลิ้งค์ดิสคอร์ดแล้ว!";
+                Text = textToCopy;
+                Duration = 5;
+            })
+        else
+            warn("setclipboard ใช้งานไม่ได้ในสภาพแวดล้อมนี้")
+        end
+    end,
+})
+
+-- ตัวแปร Global เพื่อคุมการเปิด/ปิด
+getgenv().AutoMoney = false
+
+--// 4. แก้ไขชื่อปุ่ม และ Logic การทำงาน
+MoneySection:NewToggle({
+    Title = "Dupe Money", -- แก้คำผิดจาก Mpney
+    Default = false,
+    Callback = function(state)
+        getgenv().AutoMoney = state
+        
+        if state then
+            task.spawn(function()
+                -- ดึง Remote ตรงนี้แทน เพื่อป้องกัน error ถ้าสคริปต์รันก่อนเกมโหลดเสร็จ
+                local MagnetRemote = ReplicatedStorage:WaitForChild("Tutorial_MagnetActivated", 5)
+                local PickupRemote = ReplicatedStorage:WaitForChild("RequestLootPickup", 5)
+
+                if not MagnetRemote or not PickupRemote then
+                    warn("หา Remote ไม่เจอ กรุณารอเกมโหลดสักครู่")
+                    return
+                end
+
+                while getgenv().AutoMoney do
+                    pcall(function()
+                        MagnetRemote:FireServer()
+                    end)
+
+                    local spamDuration = 0.1
+                    local loopStart = tick()
+                    
+                    -- Loop เก็บของ
+                    while (tick() - loopStart < spamDuration) and getgenv().AutoMoney do
+                        for _, block in ipairs(workspace:GetChildren()) do
+                            if not getgenv().AutoMoney then break end
+                            
+                            if block.Name == "OakLogDROP" then
+                                -- ใช้ task.spawn เพื่อไม่ให้รอ Server ตอบกลับจนเกมค้าง
+                                task.spawn(function()
+                                    pcall(function()
+                                        PickupRemote:InvokeServer(block)
+                                    end)
+                                end)
+                            end
+                        end
+                        task.wait() 
+                    end
+                    task.wait()
+                end
+            end)
+        end
+    end,
+})
+
+--// 5. แยก Shop Section ออกมาชัดเจน
+local ShopSection = TabFrame:NewSection({
+    Title = "Shop",
+    Icon = "rbxassetid://86013236874625",
+    Position = "Left"
+})
+
+ShopSection:NewDropdown({
+    Title = "Buy Platform",
+    Data = {
+        "Oak Platform",       -- 50
+        "Birch Platform",     -- 50
+        "Cherry Platform",    -- 50
+        "Bloodwood Platform", -- 50
+        "Acacia Platform",    -- 50
+        "Grass Platform",     -- 75
+        "Stone Platform",     -- 100
+        "Granite Platform",   -- 100
+        "Diorite Platform",   -- 100
+        "Blackstone Platform" -- 100
+    },
+    Default = "Oak Platform",
+    Callback = function(selectedItem)
+        local amount = 50 
+
+        if selectedItem == "Grass Platform" then
+            amount = 75
+        elseif selectedItem == "Stone Platform" 
+            or selectedItem == "Granite Platform" 
+            or selectedItem == "Diorite Platform" 
+            or selectedItem == "Blackstone Platform" then
+            amount = 100
+        end
+
+        local args = {
+            selectedItem,
+            amount
+        }
+        
+        local purchaseTool = ReplicatedStorage:WaitForChild("PurchaseTool", 2)
+        if purchaseTool then
+            purchaseTool:FireServer(unpack(args))
+            print("Purchased: " .. selectedItem .. " | Amount: " .. amount)
+        else
+            warn("ไม่เจอ Remote PurchaseTool")
+        end
+    end,
+})
+
+InfoSection:NewTitle('If you find any bugs, report in Discord.')
