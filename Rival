@@ -1,0 +1,564 @@
+local Players = game:GetService("Players")
+local vu = game:GetService("VirtualUser")
+local player = Players.LocalPlayer
+
+--// Anti-AFK Logic
+player.Idled:Connect(function()
+	vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+	task.wait(1)
+	vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+
+local startTime = tick()
+
+local NothingLibrary = loadstring(game:HttpGetAsync(
+    'https://raw.githubusercontent.com/3345-c-a-t-s-u-s/NOTHING/main/source.lua'
+))()
+
+local Windows = NothingLibrary.new({
+    Title = "AKIHUB",
+    Description = "Rival🔫: กำลังโหลดเวลา...",
+    Keybind = Enum.KeyCode.RightControl,
+    Logo = 'http://www.roblox.com/asset/?id=93623395097312'
+})
+
+-- ฟังก์ชันหา Description Label
+local function findDescriptionLabel()
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("TextLabel") and string.find(v.Text, "Rival🔫") then
+            return v
+        end
+    end
+end
+
+-- รอจนกว่าจะเจอ Label
+local descLabel
+repeat
+    descLabel = findDescriptionLabel()
+    task.wait(0.5)
+until descLabel
+
+-- อัปเดตเวลา
+task.spawn(function()
+    while true do
+        local elapsed = math.floor(tick() - startTime)
+
+        local hours = math.floor(elapsed / 3600)
+        local minutes = math.floor((elapsed % 3600) / 60)
+        local seconds = elapsed % 60
+
+        local timeText = string.format("%02d:%02d:%02d", hours, minutes, seconds)
+
+        descLabel.Text = "FishIt : Rival🔫 " .. timeText
+
+        task.wait(1)
+    end
+end)
+local TabFrame = Windows:NewTab({
+	Title = "Main",
+	Description = "Main tab",
+	Icon = "rbxassetid://82313316971391"
+})
+local Section = TabFrame:NewSection({
+	Title = "Aim Silent",
+	Icon = "rbxassetid://81687117246546",
+	Position = "Left"
+})
+
+local InfoSection = TabFrame:NewSection({
+	Title = "Information",
+	Icon = "rbxassetid://7733964719",
+	Position = "Right"
+})
+----------------------------------------------
+-- :: บริการและตัวแปรหลัก ::
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local localPlayer = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local targetPlayer = nil
+local isLeftMouseDown = false
+local isRightMouseDown = false
+local autoClickConnection = nil
+
+-- ตัวแปรสำหรับคุมการเปิด/ปิดจาก Toggle
+local ScriptEnabled = false 
+
+-- :: ฟังก์ชันต่างๆ ::
+local function isLobbyVisible()
+    -- เช็คเผื่อ Error หาก GUI โหลดไม่ทัน
+    if localPlayer.PlayerGui:FindFirstChild("MainGui") and localPlayer.PlayerGui.MainGui:FindFirstChild("MainFrame") then
+        return localPlayer.PlayerGui.MainGui.MainFrame.Lobby.Currency.Visible == true
+    end
+    return false
+end
+
+local function getClosestPlayerToMouse()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    local mousePosition = UserInputService:GetMouseLocation()
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            local headPosition, onScreen = camera:WorldToViewportPoint(head.Position)
+
+            if onScreen then
+                local screenPosition = Vector2.new(headPosition.X, headPosition.Y)
+                local distance = (screenPosition - mousePosition).Magnitude
+
+                if distance < shortestDistance then
+                    closestPlayer = player
+                    shortestDistance = distance
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+local function lockCameraToHead()
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") then
+        local head = targetPlayer.Character.Head
+        local headPosition = camera:WorldToViewportPoint(head.Position)
+        if headPosition.Z > 0 then
+            -- ปรับ CFrame ของกล้องไปที่หัว
+            camera.CFrame = CFrame.new(camera.CFrame.Position, head.Position)
+        end
+    end
+end
+
+local function autoClick()
+    if autoClickConnection then
+        autoClickConnection:Disconnect()
+    end
+    autoClickConnection = RunService.Heartbeat:Connect(function()
+        -- เพิ่มเงื่อนไข ScriptEnabled
+        if ScriptEnabled and (isLeftMouseDown or isRightMouseDown) then
+            if not isLobbyVisible() then
+                -- เช็คว่า Executor รองรับ mouse1click หรือไม่
+                if mouse1click then 
+                    mouse1click()
+                elseif input and input.press then
+                    input.press(Enum.UserInputType.MouseButton1)
+                end
+            end
+        else
+            if autoClickConnection then
+                autoClickConnection:Disconnect()
+            end
+        end
+    end)
+end
+
+-- :: ส่วนจัดการ Input (เช็คสถานะ ScriptEnabled ก่อนทำงาน) ::
+UserInputService.InputBegan:Connect(function(input, isProcessed)
+    if not ScriptEnabled then return end -- ถ้าปิด Toggle อยู่ ให้ข้ามไปเลย
+    if isProcessed then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isLeftMouseDown = true
+        autoClick()
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        isRightMouseDown = true
+        autoClick()
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, isProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isLeftMouseDown = false
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        isRightMouseDown = false
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if ScriptEnabled and not isLobbyVisible() then
+        targetPlayer = getClosestPlayerToMouse()
+        if targetPlayer then
+            lockCameraToHead()
+        end
+    else
+        targetPlayer = nil
+    end
+end)
+
+-- :: ส่วน UI Toggle ::
+Section:NewToggle({
+	Title = "Aim Silen",
+	Default = false,
+	Callback = function(state)
+        -- อัปเดตตัวแปรสถานะ
+		ScriptEnabled = state
+        
+        -- ถ้าปิดสวิตช์ ให้รีเซ็ตค่าเมาส์
+        if not state then
+            isLeftMouseDown = false
+            isRightMouseDown = false
+            targetPlayer = nil
+            if autoClickConnection then
+                autoClickConnection:Disconnect()
+            end
+        end
+	end,
+})
+local Section = TabFrame:NewSection({
+	Title = "ESP",
+	Icon = "rbxassetid://71978938811497",
+	Position = "Left"
+})
+-- บริการที่จำเป็น
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+-- ตัวแปรเก็บสถานะและการวาด
+local ESP_Enabled = false
+local ESP_Lines = {} -- เก็บเส้นที่วาดไว้เพื่อลบออกภายหลัง
+
+-- ฟังก์ชันสำหรับวาดเส้น (Drawing API)
+local function CreateLine()
+    local line = Drawing.new("Line")
+    line.Visible = false
+    line.From = Vector2.new(0, 0)
+    line.To = Vector2.new(0, 0)
+    line.Color = Color3.fromRGB(255, 255, 255) -- สีของโครงกระดูก (ขาว)
+    line.Thickness = 1
+    line.Transparency = 1
+    return line
+end
+
+-- ฟังก์ชันลบเส้นทั้งหมด (เมื่อปิด ESP หรือผู้เล่นตาย)
+local function ClearESP()
+    for _, lines in pairs(ESP_Lines) do
+        for _, line in pairs(lines) do
+            line:Remove()
+        end
+    end
+    ESP_Lines = {}
+end
+
+-- ฟังก์ชันหลักในการอัปเดตตำแหน่งเส้น
+local function UpdateESP()
+    -- ถ้าปิด ESP ให้ลบเส้นทิ้งแล้วหยุดทำงาน
+    if not ESP_Enabled then
+        ClearESP()
+        return
+    end
+
+    -- วนลูปผู้เล่นทุกคน
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local char = player.Character
+            
+            -- สร้างตารางเก็บเส้นสำหรับผู้เล่นคนนี้ถ้ายังไม่มี
+            if not ESP_Lines[player] then
+                ESP_Lines[player] = {
+                    -- R15 Joints (ตัวอย่างบางส่วน)
+                    Head_UpperTorso = CreateLine(),
+                    UpperTorso_LowerTorso = CreateLine(),
+                    
+                    -- แขนซ้าย
+                    UpperTorso_LeftUpperArm = CreateLine(),
+                    LeftUpperArm_LeftLowerArm = CreateLine(),
+                    LeftLowerArm_LeftHand = CreateLine(),
+                    
+                    -- แขนขวา
+                    UpperTorso_RightUpperArm = CreateLine(),
+                    RightUpperArm_RightLowerArm = CreateLine(),
+                    RightLowerArm_RightHand = CreateLine(),
+                    
+                    -- ขาซ้าย
+                    LowerTorso_LeftUpperLeg = CreateLine(),
+                    LeftUpperLeg_LeftLowerLeg = CreateLine(),
+                    LeftLowerLeg_LeftFoot = CreateLine(),
+                    
+                    -- ขาขวา
+                    LowerTorso_RightUpperLeg = CreateLine(),
+                    RightUpperLeg_RightLowerLeg = CreateLine(),
+                    RightLowerLeg_RightFoot = CreateLine(),
+                }
+            end
+
+            local lines = ESP_Lines[player]
+            
+            -- ฟังก์ชันย่อยสำหรับวาดเส้นเชื่อมระหว่างจุด 2 จุด
+            local function ConnectParts(line, partA_Name, partB_Name)
+                local partA = char:FindFirstChild(partA_Name)
+                local partB = char:FindFirstChild(partB_Name)
+                
+                if partA and partB then
+                    local vectorA, onScreenA = Camera:WorldToViewportPoint(partA.Position)
+                    local vectorB, onScreenB = Camera:WorldToViewportPoint(partB.Position)
+                    
+                    if onScreenA and onScreenB then
+                        line.From = Vector2.new(vectorA.X, vectorA.Y)
+                        line.To = Vector2.new(vectorB.X, vectorB.Y)
+                        line.Visible = true
+                        return
+                    end
+                end
+                line.Visible = false
+            end
+
+            -- เชื่อมจุดต่างๆ (รองรับ R15 เป็นหลัก)
+            ConnectParts(lines.Head_UpperTorso, "Head", "UpperTorso")
+            ConnectParts(lines.UpperTorso_LowerTorso, "UpperTorso", "LowerTorso")
+            
+            -- แขน
+            ConnectParts(lines.UpperTorso_LeftUpperArm, "UpperTorso", "LeftUpperArm")
+            ConnectParts(lines.LeftUpperArm_LeftLowerArm, "LeftUpperArm", "LeftLowerArm")
+            ConnectParts(lines.LeftLowerArm_LeftHand, "LeftLowerArm", "LeftHand")
+            
+            ConnectParts(lines.UpperTorso_RightUpperArm, "UpperTorso", "RightUpperArm")
+            ConnectParts(lines.RightUpperArm_RightLowerArm, "RightUpperArm", "RightLowerArm")
+            ConnectParts(lines.RightLowerArm_RightHand, "RightLowerArm", "RightHand")
+
+            -- ขา
+            ConnectParts(lines.LowerTorso_LeftUpperLeg, "LowerTorso", "LeftUpperLeg")
+            ConnectParts(lines.LeftUpperLeg_LeftLowerLeg, "LeftUpperLeg", "LeftLowerLeg")
+            ConnectParts(lines.LeftLowerLeg_LeftFoot, "LeftLowerLeg", "LeftFoot")
+
+            ConnectParts(lines.LowerTorso_RightUpperLeg, "LowerTorso", "RightUpperLeg")
+            ConnectParts(lines.RightUpperLeg_RightLowerLeg, "RightUpperLeg", "RightLowerLeg")
+            ConnectParts(lines.RightLowerLeg_RightFoot, "RightLowerLeg", "RightFoot")
+
+        else
+            -- ถ้าผู้เล่นตายหรือหายไป ให้ซ่อนเส้น
+            if ESP_Lines[player] then
+                for _, line in pairs(ESP_Lines[player]) do
+                    line.Visible = false
+                end
+            end
+        end
+    end
+end
+
+-- เชื่อมต่อกับ RenderStepped เพื่ออัปเดตทุกเฟรม
+RunService.RenderStepped:Connect(UpdateESP)
+
+-- เมื่อผู้เล่นออกจากเกม ให้ลบเส้นของคนนั้น
+Players.PlayerRemoving:Connect(function(player)
+    if ESP_Lines[player] then
+        for _, line in pairs(ESP_Lines[player]) do
+            line:Remove()
+        end
+        ESP_Lines[player] = nil
+    end
+end)
+
+----------------------------------------------------------------
+-- ส่วน UI Toggle ของคุณ
+----------------------------------------------------------------
+
+Section:NewToggle({
+    Title = "Skeleton ESP",
+    Default = false,
+    Callback = function(state)
+        ESP_Enabled = state -- เปลี่ยนค่าตัวแปรตามสถานะ Toggle
+    end,
+})
+-- บริการที่จำเป็น
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+-- ตัวแปรเก็บสถานะและการวาด
+local Box_Enabled = false
+local Box_Cache = {} -- เก็บ Object ของ Box แยกตามผู้เล่น
+
+-- ฟังก์ชันสร้าง Box ใหม่
+local function CreateBox()
+    local box = Drawing.new("Square")
+    box.Visible = false
+    box.Color = Color3.fromRGB(255, 0, 0) -- สีของกล่อง (แดง)
+    box.Thickness = 1
+    box.Transparency = 1
+    box.Filled = false -- ไม่เติมสีข้างใน (ให้เป็นแค่กรอบ)
+    return box
+end
+
+-- ฟังก์ชันลบ Box ทั้งหมด (เมื่อปิด ESP)
+local function ClearBoxes()
+    for _, box in pairs(Box_Cache) do
+        box:Remove()
+    end
+    Box_Cache = {}
+end
+
+-- ฟังก์ชันอัปเดต Box
+local function UpdateBoxes()
+    -- ถ้าปิดระบบ ให้ลบกล่องทิ้งและหยุดทำงาน
+    if not Box_Enabled then
+        ClearBoxes()
+        return
+    end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            
+            -- สร้าง Box ให้ผู้เล่นคนนี้ถ้ายังไม่มี
+            if not Box_Cache[player] then
+                Box_Cache[player] = CreateBox()
+            end
+
+            local box = Box_Cache[player]
+            local rootPart = player.Character.HumanoidRootPart
+            
+            -- คำนวณตำแหน่งบนหน้าจอ (WorldToViewportPoint)
+            local vector, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+
+            if onScreen then
+                -- คำนวณขนาดของ Box ตามระยะห่าง (ยิ่งไกลยิ่งเล็ก)
+                -- 2000 และ 1000 คือค่า scaling factor ปรับได้ตามความเหมาะสม
+                local rootPos = rootPart.Position
+                local dist = (Camera.CFrame.Position - rootPos).Magnitude
+                local scaleFactor = 1000 / dist
+                
+                local width = 2 * scaleFactor
+                local height = 3.5 * scaleFactor -- ปกติความสูงจะมากกว่าความกว้าง
+
+                -- กำหนดตำแหน่งและขนาดของ Box
+                box.Size = Vector2.new(width, height)
+                -- จัดตำแหน่งให้ Box อยู่กึ่งกลางตัวละคร (ลบครึ่งหนึ่งของขนาดออกจากจุดศูนย์กลาง)
+                box.Position = Vector2.new(vector.X - width / 2, vector.Y - height / 2)
+                
+                box.Visible = true
+            else
+                box.Visible = false
+            end
+        else
+            -- ถ้าผู้เล่นไม่อยู่ในเงื่อนไข (ตาย/หาย) ให้ซ่อน Box
+            if Box_Cache[player] then
+                Box_Cache[player].Visible = false
+            end
+        end
+    end
+end
+
+-- ลบ Box ของคนที่ออกจากเกม
+Players.PlayerRemoving:Connect(function(player)
+    if Box_Cache[player] then
+        Box_Cache[player]:Remove()
+        Box_Cache[player] = nil
+    end
+end)
+
+-- รันฟังก์ชัน Update ทุกเฟรม
+RunService.RenderStepped:Connect(UpdateBoxes)
+
+----------------------------------------------------------------
+-- ส่วน UI Toggle ของคุณ
+----------------------------------------------------------------
+
+Section:NewToggle({
+    Title = "Box ESP",
+    Default = false,
+    Callback = function(state)
+        Box_Enabled = state -- อัปเดตสถานะเปิด/ปิด
+    end,
+})
+-- บริการที่จำเป็น
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+-- ตัวแปรเก็บสถานะและ Cache ของเส้น
+local Tracer_Enabled = false
+local Tracer_Cache = {} -- เก็บเส้นแยกตามผู้เล่น
+
+-- ฟังก์ชันสร้างเส้น Tracer ใหม่
+local function CreateTracer()
+    local line = Drawing.new("Line")
+    line.Visible = false
+    line.Color = Color3.fromRGB(0, 255, 0) -- สีเขียว
+    line.Thickness = 1
+    line.Transparency = 1
+    return line
+end
+
+-- ฟังก์ชันลบเส้นทั้งหมด
+local function ClearTracers()
+    for _, line in pairs(Tracer_Cache) do
+        line:Remove()
+    end
+    Tracer_Cache = {}
+end
+
+-- ฟังก์ชันอัปเดตเส้น Tracer
+local function UpdateTracers()
+    -- ถ้าปิดระบบ ให้ลบเส้นทิ้งแล้วหยุดทำงาน
+    if not Tracer_Enabled then
+        ClearTracers()
+        return
+    end
+
+    -- จุดเริ่มต้นของเส้น (กึ่งกลางด้านล่างของจอ)
+    -- ถ้าอยากให้เริ่มจากกลางจอเปลี่ยนเป็น: Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local Origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            
+            -- สร้างเส้นให้ผู้เล่นคนนี้ถ้ายังไม่มี
+            if not Tracer_Cache[player] then
+                Tracer_Cache[player] = CreateTracer()
+            end
+
+            local line = Tracer_Cache[player]
+            local rootPart = player.Character.HumanoidRootPart
+            
+            -- คำนวณตำแหน่งศัตรูบนหน้าจอ
+            local vector, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+
+            if onScreen then
+                line.From = Origin -- จุดเริ่ม (ล่างจอ)
+                line.To = Vector2.new(vector.X, vector.Y) -- จุดปลาย (ตัวศัตรู)
+                line.Visible = true
+            else
+                -- ถ้าศัตรูไม่อยู่ในจอ ให้ซ่อนเส้น (จะได้ไม่รกหรือบัค)
+                line.Visible = false
+            end
+        else
+            -- ถ้าผู้เล่นตาย/หายไป ให้ซ่อนเส้น
+            if Tracer_Cache[player] then
+                Tracer_Cache[player].Visible = false
+            end
+        end
+    end
+end
+
+-- ลบเส้นเมื่อผู้เล่นออกจากเกม
+Players.PlayerRemoving:Connect(function(player)
+    if Tracer_Cache[player] then
+        Tracer_Cache[player]:Remove()
+        Tracer_Cache[player] = nil
+    end
+end)
+
+-- รันฟังก์ชัน Update ทุกเฟรม
+RunService.RenderStepped:Connect(UpdateTracers)
+
+----------------------------------------------------------------
+-- ส่วน UI Toggle ของคุณ
+----------------------------------------------------------------
+
+Section:NewToggle({
+    Title = "Tracer ESP",
+    Default = false,
+    Callback = function(state)
+        Tracer_Enabled = state -- อัปเดตสถานะเปิด/ปิด
+    end,
+})
+InfoSection:NewTitle('Join my Discord')
+InfoSection:NewButton({
+    Title = "Copy Discord Link",
+    Callback = function()
+        setclipboard("https://discord.gg/NeGv59fYEd") 
+    end,
+})
