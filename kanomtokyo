@@ -55,7 +55,7 @@ end)
     local TabFrame = Windows:NewTab({
     	Title = "Main",
     	Description = "Fram tab",
-    	Icon = "rbxassetid://109805612001451"
+    	Icon = "rbxassetid://80313090537874"
     })
     local Section = TabFrame:NewSection({
     	Title = "Farm Menu",
@@ -109,7 +109,7 @@ end
 -- Function: Normal Attack
 local function NormalAttack()
     pcall(function()
-        local args = { { "NormalAttack", "\r" } }
+        local args = { { "NormalAttack", "\014" } }
         ReplicatedStorage:WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
     end)
 end
@@ -159,7 +159,7 @@ local function GetLevel()
     end
 end
 
--- Quest Data
+-- Quest Data (Updated)
 local QuestTable = {
     {1, 49, "QuestGiver (Lv.1-Lv.50)", "Human,Athlete"},
     {50, 149, "QuestGiver (Lv.50-Lv.150)", "Rank 2 Investigator"},
@@ -169,7 +169,9 @@ local QuestTable = {
     {400, 449, "QuestGiver (Lv.400-Lv.450)", "Rin Ghoul"},
     {450, 499, "QuestGiver (Lv.450-Lv.500)", "First class Investigator"},
     {500, 549, "QuestGiver (Lv.500-Lv.550)", "Aogiri"},
-    {550, 599, "QuestGiver (Lv.550-Lv.600)", "Akira"}
+    {550, 599, "QuestGiver (Lv.550-Lv.600)", "Akira"},
+    {600, 699, "QuestGiver (Lv.600-Lv.700)", "Enforcer"},
+    {700, 800, "QuestGiver (Lv.700-Lv.800)", "Phantom"}
 }
 
 local function GetQuestData()
@@ -539,7 +541,7 @@ local attackRemote =
 local attackArgs = {
 	{
 		"NormalAttack",
-		"\r"
+		"\014"
 	}
 }
 
@@ -981,7 +983,7 @@ local Player = Players.LocalPlayer
 
 -- ================== ATTACK REMOTE ===================
 local function NormalAttack()
-    local args = {{"NormalAttack","\r"}}
+    local args = {{"NormalAttack","\014"}}
     ReplicatedStorage:WaitForChild("BridgeNet2")
         :WaitForChild("dataRemoteEvent")
         :FireServer(unpack(args))
@@ -1165,7 +1167,7 @@ Section:NewToggle({
     local TabFrame = Windows:NewTab({
     	Title = "Teleport",
     	Description = "Teleport To Savezone and Boss",
-    	Icon = "rbxassetid://126437319037726"
+    	Icon = "rbxassetid://136578691850987"
     })
     
     local Section = TabFrame:NewSection({
@@ -1202,13 +1204,25 @@ Section:NewButton({
 })
 
 Section:NewButton({
-    Title = "Cafe",
+    Title = "Ghoul Spawn",
     Callback = function()
-        local targetPosition = Vector3.new(-107, 5, 206)
+        local targetPosition = Vector3.new(-102, 5, 206)
         TweenToPosition(targetPosition, TWEEN_SPEED)
     end,
 })
 
+Section:NewButton({
+    Title = "Cafe",
+    Callback = function()
+        local targetPosition = Vector3.new(446, 20, 161)
+        TweenToPosition(targetPosition, TWEEN_SPEED)
+    end,
+})
+local Section = TabFrame:NewSection({
+	Title = "Boss",
+	Icon = "rbxassetid://7743869054",
+	Position = "Left"
+})
 Section:NewButton({
     Title = "Json",
     Callback = function()
@@ -1218,10 +1232,176 @@ Section:NewButton({
 })
 
 Section:NewButton({
+    Title = "Noro",
+    Callback = function()
+        local targetPosition = Vector3.new(225, 8, -157)
+        TweenToPosition(targetPosition, TWEEN_SPEED)
+    end,
+})
+
+Section:NewButton({
     Title = "Kaneki",
     Callback = function()
         local targetPosition = Vector3.new(143, 5, 620)
         TweenToPosition(targetPosition, TWEEN_SPEED)
+    end,
+})
+local TabFrame = Windows:NewTab({
+	Title = "Quest Tap",
+	Description = "Quest tab",
+	Icon = "rbxassetid://7733960981"
+})
+
+local Section = TabFrame:NewSection({
+	Title = "Quest",
+	Icon = "rbxassetid://7743869054",
+	Position = "Left"
+})
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- ตัวแปรควบคุมการทำงาน
+local isRunning = false
+
+-- ฟังก์ชันหยุดตัวละคร
+local function StopMovement()
+    hrp.Velocity = Vector3.new(0, 0, 0)
+    hrp.RotVelocity = Vector3.new(0, 0, 0)
+end
+
+-- ฟังก์ชันหาปุ่ม UI
+local function FindHinamiButton()
+    for _, gui in pairs(playerGui:GetDescendants()) do
+        if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible then
+            local textLabel = gui:FindFirstChildOfClass("TextLabel")
+            local btnText = textLabel and textLabel.Text or (gui:IsA("TextButton") and gui.Text or "")
+            if string.find(string.lower(btnText), "of course") or string.find(string.lower(btnText), "hinami") then
+                return gui
+            end
+        end
+    end
+    return nil
+end
+
+-- ฟังก์ชันกด F รัวๆ
+local function SpamF(seconds)
+    local endTime = tick() + seconds
+    while tick() < endTime and isRunning do
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+        task.wait(0.05)
+    end
+end
+
+-- ฟังก์ชันหาดอกไม้ที่ใกล้ที่สุด
+local usedFlowers = {}
+local function GetNearestFlower()
+    local nearest = nil
+    local minDistance = math.huge
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj.Name == "Flower" and not usedFlowers[obj] then
+            local p = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
+            if p then
+                local dist = (hrp.Position - p.Position).Magnitude
+                if dist < minDistance then
+                    minDistance = dist
+                    nearest = obj
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+-- ==========================================
+-- UI Toggle Section
+-- ==========================================
+Section:NewToggle({
+    Title = "Auto Hinami & Flower",
+    Default = false,
+    Callback = function(tr)
+        isRunning = tr
+        
+        if isRunning then
+            print("เริ่มทำงาน...")
+            
+            -- 1. ไปหา Hinami
+            local npc = workspace:WaitForChild("TalkNpc"):WaitForChild("Special"):WaitForChild("Hinami")
+            local targetCFrame = (npc.PrimaryPart and npc.PrimaryPart.CFrame or npc:GetModelCFrame()) * CFrame.new(0, 0, -2)
+
+            local tweenNPC = TweenService:Create(hrp, TweenInfo.new(1.2, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+            tweenNPC:Play()
+            tweenNPC.Completed:Wait()
+            StopMovement()
+
+            if not isRunning then return end -- เช็คอีกรอบเผื่อปิดกลางคัน
+
+            -- เปิดบทสนทนา
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+            task.wait(1.2)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+
+            -- หาและกดปุ่ม
+            local button = nil
+            local retry = 0
+            repeat 
+                button = FindHinamiButton()
+                task.wait(0.5)
+                retry = retry + 1
+            until button or retry > 10 or not isRunning
+
+            if button and isRunning then
+                GuiService.SelectedObject = button
+                task.wait(0.2)
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+                task.wait(0.1)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+                pcall(function() button:Activate() end)
+                
+                task.wait(1.5)
+                
+                -- 2. ไปหา Flower 3 อัน
+                usedFlowers = {} -- ล้างค่าเก่า
+                for i = 1, 3 do
+                    if not isRunning then break end
+                    
+                    local targetFlower = GetNearestFlower()
+                    if targetFlower then
+                        usedFlowers[targetFlower] = true
+                        local part = targetFlower:IsA("BasePart") and targetFlower or targetFlower:FindFirstChildWhichIsA("BasePart", true)
+                        
+                        if part then
+                            local targetPos = part.Position + Vector3.new(0, 2, 0)
+                            local finalCFrame = CFrame.new(targetPos, Vector3.new(part.Position.X, targetPos.Y, part.Position.Z))
+                            
+                            local distance = (hrp.Position - targetPos).Magnitude
+                            local travelTime = distance / 50
+                            
+                            local tween = TweenService:Create(hrp, TweenInfo.new(travelTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = finalCFrame})
+                            tween:Play()
+                            tween.Completed:Wait()
+                            
+                            StopMovement()
+                            task.wait(0.2)
+                            SpamF(1.2)
+                            task.wait(0.5)
+                        end
+                    end
+                end
+                print("จบภารกิจ")
+            end
+        else
+            print("หยุดการทำงาน")
+            StopMovement()
+        end
     end,
 })
 -----WEBHOOK
