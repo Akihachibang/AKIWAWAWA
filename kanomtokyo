@@ -18,7 +18,7 @@ local Windows = NothingLibrary.new({
     Title = "AKIHUB",
     Description = "Kanom tokyo : กำลังโหลดเวลา...",
     Keybind = Enum.KeyCode.RightControl,
-    Logo = 'http://www.roblox.com/asset/?id=132859275883558'
+    Logo = 'http://www.roblox.com/asset/?id=123772963717609'
 })
 
 -- รอ UI โหลด
@@ -58,8 +58,8 @@ end)
     	Icon = "rbxassetid://80313090537874"
     })
     local Section = TabFrame:NewSection({
-    	Title = "Farm Menu",
-    	Icon = "rbxassetid://7743869054",
+    	Title = "Farm Level",
+    	Icon = "rbxassetid://116520925666989",
     	Position = "Left"
     })
     local InfoSection = TabFrame:NewSection({
@@ -503,9 +503,9 @@ Log("Script loaded successfully! All features ready.")
 Log("Current Level: " .. tostring(GetLevel()))
 
 ----ฆ่าบอส
-    local Section = TabFrame:NewSection({
+local Section = TabFrame:NewSection({
     	Title = "Boss Target",
-    	Icon = "rbxassetid://7743869054",
+    	Icon = "rbxassetid://100017212359303",
     	Position = "Left"
     })
 ---------------------------------------------
@@ -760,7 +760,7 @@ Section:NewSlider({
     })
     local Section = TabFrame:NewSection({
 	Title = "Player",
-	Icon = "rbxassetid://7743869054",
+	Icon = "rbxassetid://100713420961350",
 	Position = "Left"
     })
 ----------------------------
@@ -866,7 +866,7 @@ local player = Players.LocalPlayer
 -- เริ่มต้น Section ตามที่คุณให้
 local Section = TabFrame:NewSection({
     Title = "Stats", 
-    Icon = "rbxassetid://7743869054",
+    Icon = "rbxassetid://106134345394902",
     Position = "Left"
 })
 
@@ -948,7 +948,7 @@ end)
 -----------------------------------------------------
 local Section = TabFrame:NewSection({
 	Title = "FramMonster",
-	Icon = "rbxassetid://7743869054",
+	Icon = "rbxassetid://88389776033023",
 	Position = "Left"
 })
 -------------------------------------------------------
