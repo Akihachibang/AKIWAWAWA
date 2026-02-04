@@ -1,0 +1,693 @@
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- ==============================
+-- 1. Anti-AFK & Setup
+-- ==============================
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+
+local startTime = tick()
+local NothingLibrary = loadstring(game:HttpGetAsync('https://raw.githubusercontent.com/3345-c-a-t-s-u-s/NOTHING/main/source.lua'))()
+
+local Windows = NothingLibrary.new({
+    Title = "AKIHUB",
+    Description = "Rogue Piece: Auto Tanjiro Coord Fix",
+    Keybind = Enum.KeyCode.RightControl,
+    Logo = 'http://www.roblox.com/asset/?id=93623395097312'
+})
+
+-- Update Time
+task.spawn(function()
+    local function findDescriptionLabel()
+        for _, v in pairs(game.CoreGui:GetDescendants()) do 
+            if v:IsA("TextLabel") and string.find(v.Text, "Rogue Piece") then return v end
+        end
+        return nil
+    end
+    local descLabel
+    repeat task.wait(1) descLabel = findDescriptionLabel() until descLabel
+    while true do
+        local elapsed = math.floor(tick() - startTime)
+        local h, m, s = math.floor(elapsed/3600), math.floor((elapsed%3600)/60), elapsed%60
+        descLabel.Text = string.format("Rogue Piece: %02d:%02d:%02d", h, m, s)
+        task.wait(1)
+    end
+end)
+
+-- ==============================
+-- 2. Global Variables
+-- ==============================
+_G.AutoFarm = false
+_G.AutoBoss = false 
+_G.AutoDungeon = false
+_G.AutoFarmMonster = false
+_G.AutoTanjiro = false
+_G.AutoHaki = false
+_G.ShowBossUI = true
+_G.TanjiroKillCount = 0
+
+_G.Distance = 7
+_G.PositionMode = "Under (Look Up)" 
+_G.SelectedWeapon = "Combat"
+_G.SelectedBoss = "Yuta" 
+_G.SelectedMonster = "Bandit"
+_G.AutoSkillSpam = true 
+_G.AutoObservation = false
+
+-- Data
+local FruitList = { "Light", "Magu", "Mera", "Hie", "Goro", "Yami", "Pika", "Doku", "Gura", "Blood" }
+
+local MonsterLocations = {
+    ["Bandit"] = {"Main","Characters","Windmill Village","Bandit"},
+    ["Bandit Leader"] = {"Main","Characters","Windmill Village","Bandit Leader"},
+    ["Skeleton"] = {"Main","Characters","Whispering Jungle","Skeleton"},
+    ["Pirate Skeleton"] = {"Main","Characters","Whispering Jungle","Pirate Skeleton"},
+    ["Desert Thief"] = {"Main","Characters","Sandora Island"}, 
+    ["Katana Master"] = {"Main","Characters","Sandora Island"}, 
+    ["Mihawk"] = {"Main","Characters","Glacier Isle","Mihawk"},
+    ["Slayer's Trainee"] = {"Main","Characters","Forge Isle","Slayer's Trainee"},
+    ["Sorcerer's Student"] = {"Main","Characters","Jujutsu Highschool","Sorcerer's Student"},
+    ["Sorcerer's Teacher"] = {"Main","Characters","Jujutsu Highschool","Sorcerer's Teacher"},
+    ["Konoha's Ninja"] = {"Main","Characters","Konoha Village","Konoha's Ninja"},
+    ["Konoha's Head Ninja"] = {"Main","Characters","Konoha Village","Konoha's Head Ninja"}
+}
+local MonsterList = {}
+for name, _ in pairs(MonsterLocations) do table.insert(MonsterList, name) end
+table.sort(MonsterList)
+
+local BossData = {
+    ["Yuta"] = {"Main", "Characters", "Jujutsu Highschool", "Boss", "Yuta"},
+    ["Sukuna Shibuya"] = {"Main", "Characters", "Throne Isle", "Boss", "Sukuna Shibuya"},
+    ["Sukuna"] = {"Main", "Characters", "Throne Isle", "Boss", "Sukuna"},
+    ["Sung Jin Woo"] = {"Main", "Characters", "Rogue Town [Backside]", "Boss", "Sung Jin Woo"},
+    ["Todoroki"] = {"Main", "Characters", "Throne Isle", "Boss", "Todoroki"},
+    ["Naoya"] = {"Main", "Characters", "Abyss Hill [Upper]", "Boss", "Naoya"},
+    ["Toji"] = {"Main", "Characters", "Jujutsu Highschool", "Boss", "Toji"},
+    ["Silver Fang"] = {"Main", "Characters", "Rogue Town [Backside]", "Boss", "Silver Fang"},
+    ["Hakari"] = {"Main", "Characters", "Rogue Town", "Boss", "Hakari"},
+    ["Akaza"] = {"Main", "Characters", "Throne Isle", "Boss", "Akaza"},
+    ["David"] = {"Main", "Characters", "Throne Isle", "Boss", "David"},
+    ["Gojo"] = {"Main", "Characters", "Throne Isle", "Boss", "Gojo"},
+    ["Gojo Shibuya"] = {"Main", "Characters", "Throne Isle", "Boss", "Gojo Shibuya"},
+    ["Tanjiro"] = {"Main", "Characters", "Forge Isle", "Boss", "Tanjiro"}
+}
+
+local BossList = {}
+for name, _ in pairs(BossData) do table.insert(BossList, name) end
+table.sort(BossList)
+
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    Character = newChar
+    RootPart = newChar:WaitForChild("HumanoidRootPart")
+    
+    if _G.AutoHaki then
+        task.wait(1)
+        pcall(function() 
+            local args = { "Server", "Misc", "Haki", 1 }
+            game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Serverside"):FireServer(unpack(args))
+        end)
+    end
+    
+    if _G.AutoObservation then
+        task.wait(1)
+        pcall(function() game:GetService("ReplicatedStorage").Remotes.Serverside:FireServer("Server", "Misc", "Observation", 1) end)
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if (_G.AutoFarm or _G.AutoBoss or _G.AutoDungeon or _G.AutoFarmMonster or _G.AutoTanjiro) and Character then
+        for _, v in pairs(Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+end)
+
+-- ==============================
+-- 3. Helper Functions
+-- ==============================
+local function GetMyTools()
+    local t = {}
+    for _,v in pairs(LocalPlayer.Backpack:GetChildren()) do if v:IsA("Tool") then table.insert(t, v.Name) end end
+    if LocalPlayer.Character then for _,v in pairs(LocalPlayer.Character:GetChildren()) do if v:IsA("Tool") then table.insert(t, v.Name) end end end
+    if #t == 0 then table.insert(t, "Combat") end
+    return t
+end
+
+local function GetFolderFromPath(pathTable)
+    local obj = workspace
+    for _, name in ipairs(pathTable) do
+        if obj:FindFirstChild(name) then obj = obj[name] else return nil end
+    end
+    return obj
+end
+
+local function HasQuest()
+    local gui = LocalPlayer:FindFirstChild("PlayerGui")
+    return gui and gui:FindFirstChild("HUD") and gui.HUD.Bar.List:FindFirstChild("Quest")
+end
+
+local function TweenTo(targetCF)
+    if not RootPart then return end
+    local dist = (RootPart.Position - targetCF.Position).Magnitude
+    if dist < 5 then return end
+    
+    -- SUPER FAST TWEEN
+    if dist > 300 then
+        RootPart.CFrame = targetCF
+    else
+        local tween = TweenService:Create(RootPart, TweenInfo.new(dist/2000, Enum.EasingStyle.Linear), {CFrame = targetCF})
+        tween:Play()
+        local s = tick()
+        repeat task.wait() 
+            if not (_G.AutoFarm or _G.AutoBoss or _G.AutoDungeon or _G.AutoFarmMonster or _G.AutoTanjiro) then tween:Cancel(); break end
+        until (RootPart.Position - targetCF.Position).Magnitude < 5 or tick() - s > 15
+    end
+end
+
+local function GetFarmPosition(targetRoot)
+    local d, m = _G.Distance, _G.PositionMode
+    if m == "Under (Look Up)" then return targetRoot.CFrame * CFrame.new(0, -d, 0) * CFrame.Angles(math.rad(90), 0, 0)
+    elseif m == "Above (Look Down)" then return targetRoot.CFrame * CFrame.new(0, d, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+    else return targetRoot.CFrame * CFrame.new(0, 0, d) end
+end
+
+local function LockPosition(target, mode)
+    local con
+    con = RunService.Heartbeat:Connect(function()
+        if not target or not target:FindFirstChild("HumanoidRootPart") or target.Humanoid.Health <= 0 then con:Disconnect(); return end
+        
+        if mode == "Farm" and not _G.AutoFarm then con:Disconnect(); return end
+        if mode == "Boss" and not _G.AutoBoss then con:Disconnect(); return end
+        if mode == "Dungeon" and not _G.AutoDungeon then con:Disconnect(); return end
+        if mode == "FarmMonster" and not _G.AutoFarmMonster then con:Disconnect(); return end
+        if mode == "Tanjiro" and not _G.AutoTanjiro then con:Disconnect(); return end
+
+        RootPart.CFrame = GetFarmPosition(target.HumanoidRootPart)
+        RootPart.Velocity = Vector3.new(0,0,0)
+    end)
+end
+
+local function PressKey(key)
+    VirtualInputManager:SendKeyEvent(true, key, false, game)
+    task.wait(0.01)
+    VirtualInputManager:SendKeyEvent(false, key, false, game)
+end
+
+local function AttackLoop(target, mode)
+    while target and target:FindFirstChild("Humanoid") and target.Humanoid.Health > 0 do
+        if mode == "Farm" and (not _G.AutoFarm or not HasQuest()) then break end
+        if mode == "Boss" and not _G.AutoBoss then break end
+        if mode == "Dungeon" and not _G.AutoDungeon then break end
+        if mode == "FarmMonster" and not _G.AutoFarmMonster then break end
+        if mode == "Tanjiro" and not _G.AutoTanjiro then break end
+
+        local toolName = _G.SelectedWeapon
+        local tool = LocalPlayer.Backpack:FindFirstChild(toolName) or Character:FindFirstChild(toolName)
+        
+        if tool then
+            if tool.Parent == LocalPlayer.Backpack then Character.Humanoid:EquipTool(tool) end
+            pcall(function()
+                local args = { "Server", "Combat", "M1s", toolName, 0 }
+                if toolName == "Shadow" then args = {"Server", "Combat", "M1s", "Shadow", 2}
+                elseif toolName == "Sukuna" then args = {"Server", "Combat", "M1s", "Sukuna", 1} 
+                elseif toolName == "Abyssbreaker" then args = {"Server", "Sword", "M1s", "Abyssbreaker", 3} end
+                ReplicatedStorage.Remotes.Serverside:FireServer(unpack(args))
+            end)
+            if _G.AutoSkillSpam then
+                PressKey(Enum.KeyCode.Z); PressKey(Enum.KeyCode.X); PressKey(Enum.KeyCode.C); PressKey(Enum.KeyCode.V)
+            end
+        end
+        task.wait()
+    end
+end
+
+local function GetClosestMob(folder, mobName)
+    local closestMob = nil
+    local shortestDistance = math.huge
+    if folder and RootPart then
+        for _, v in ipairs(folder:GetDescendants()) do
+            local isMatch = (mobName == nil) or (v.Name == mobName)
+            if v:IsA("Model") and isMatch and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Humanoid.Health > 0 then
+                local dist = (RootPart.Position - v.HumanoidRootPart.Position).Magnitude
+                if dist < shortestDistance then
+                    shortestDistance = dist
+                    closestMob = v
+                end
+            end
+        end
+    end
+    return closestMob
+end
+
+local function GetRandomMob(folder)
+    local validMobs = {}
+    if folder then
+        for _, v in ipairs(folder:GetChildren()) do
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Humanoid.Health > 0 then
+                table.insert(validMobs, v)
+            end
+        end
+    end
+    if #validMobs > 0 then return validMobs[math.random(1, #validMobs)] end
+    return nil
+end
+
+local function FindSlayerTraineeFixed()
+    for _, v in pairs(workspace.Main.Characters:GetDescendants()) do
+        if v.Name == "Slayer's Trainee" and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 and v:FindFirstChild("HumanoidRootPart") then
+            return v
+        end
+    end
+    return nil
+end
+
+local function FindTanjiroBoss()
+    local folder = workspace.Main.Characters:FindFirstChild("Forge Isle")
+    if folder and folder:FindFirstChild("Boss") and folder.Boss:FindFirstChild("Tanjiro") then
+        local boss = folder.Boss.Tanjiro
+        if boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 then
+            return boss
+        end
+    end
+    return nil
+end
+
+local function ServerHop()
+    local PlaceID = game.PlaceId
+    local AllIDs = {}
+    local foundAnything = ""
+    local actualHour = os.date("!*t").hour
+    local Deleted = false
+    local function TPReturner()
+        local Site;
+        if foundAnything == "" then
+            Site = game.HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100'))
+        else
+            Site = game.HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100&cursor=' .. foundAnything))
+        end
+        if Site.nextPageCursor and Site.nextPageCursor ~= "null" and Site.nextPageCursor ~= nil then foundAnything = Site.nextPageCursor end
+        for _, v in pairs(Site.data) do
+            local Possible = true
+            if v.maxPlayers > v.playing then
+                for _, Existing in pairs(AllIDs) do if v.id == Existing then Possible = false end end
+                if Possible then
+                    table.insert(AllIDs, v.id)
+                    wait(); pcall(function() wait(0.5); game:GetService("TeleportService"):TeleportToPlaceInstance(PlaceID, v.id, game.Players.LocalPlayer) end)
+                    wait(4)
+                end
+            end
+        end
+    end
+    local function Start() while wait() do pcall(function() TPReturner(); if foundAnything ~= "" then TPReturner() end end) end end
+    Start()
+end
+
+-- ==============================
+-- 4. Boss Status UI
+-- ==============================
+local function CreateBossUI()
+    local BossGui = Instance.new("ScreenGui")
+    local MainFrame = Instance.new("Frame")
+    local Title = Instance.new("TextLabel")
+    local ScrollFrame = Instance.new("ScrollingFrame")
+    local UIListLayout = Instance.new("UIListLayout")
+
+    BossGui.Name = "BossStatusUI"
+    BossGui.Parent = CoreGui
+    BossGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    MainFrame.Name = "MainFrame"
+    MainFrame.Parent = BossGui
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    MainFrame.BackgroundTransparency = 0.2
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Position = UDim2.new(0.85, 0, 0.2, 0)
+    MainFrame.Size = UDim2.new(0, 200, 0, 300)
+
+    Title.Name = "Title"
+    Title.Parent = MainFrame
+    Title.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
+    Title.Size = UDim2.new(1, 0, 0, 30)
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "Boss Status"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 16.000
+
+    ScrollFrame.Parent = MainFrame
+    ScrollFrame.Active = true
+    ScrollFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ScrollFrame.BackgroundTransparency = 1.000
+    ScrollFrame.Position = UDim2.new(0, 0, 0.1, 0)
+    ScrollFrame.Size = UDim2.new(1, 0, 0.9, 0)
+    ScrollFrame.ScrollBarThickness = 4
+
+    UIListLayout.Parent = ScrollFrame
+    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    task.spawn(function()
+        while task.wait(1) do
+            if not _G.ShowBossUI then 
+                MainFrame.Visible = false
+            else
+                MainFrame.Visible = true
+                for _, child in pairs(ScrollFrame:GetChildren()) do
+                    if child:IsA("TextLabel") then child:Destroy() end
+                end
+
+                for _, bossName in ipairs(BossList) do
+                    local pathData = BossData[bossName]
+                    local bossModel = GetFolderFromPath(pathData)
+                    local statusText = "Waiting..."
+                    local statusColor = Color3.fromRGB(255, 50, 50)
+
+                    if bossModel and bossModel:FindFirstChild("Humanoid") and bossModel.Humanoid.Health > 0 then
+                        statusText = "Spawned"
+                        statusColor = Color3.fromRGB(50, 255, 50)
+                    end
+
+                    local Label = Instance.new("TextLabel")
+                    Label.Parent = ScrollFrame
+                    Label.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                    Label.BackgroundTransparency = 1.000
+                    Label.Size = UDim2.new(1, 0, 0, 25)
+                    Label.Font = Enum.Font.GothamSemibold
+                    Label.Text = bossName .. ": " .. statusText
+                    Label.TextColor3 = statusColor
+                    Label.TextSize = 14.000
+                end
+            end
+        end
+    end)
+end
+CreateBossUI()
+
+-- ==============================
+-- 5. UI Construction
+-- ==============================
+local TabFrame = Windows:NewTab({ Title = "Main", Description = "Auto Farm & Boss", Icon = "rbxassetid://80313090537874" })
+local StatsTab = Windows:NewTab({ Title = "Stats", Description = "Auto Upgrade", Icon = "rbxassetid://7733960981" })
+local IslandTab = Windows:NewTab({ Title = "Island", Description = "Teleport Maps & NPCs", Icon = "rbxassetid://7733960981" })
+
+local FarmSection = TabFrame:NewSection({ Title = "FarmLevel", Icon = "rbxassetid://7743869054", Position = "Left" })
+local DungeonSection = TabFrame:NewSection({ Title = "Dungeon", Icon = "rbxassetid://7743869054", Position = "Left" })
+local MaterialSection = TabFrame:NewSection({ Title = "Farm Material", Icon = "rbxassetid://7743869054", Position = "Left" })
+local FarmMonsterSection = TabFrame:NewSection({ Title = "Farm Monster", Icon = "rbxassetid://7743869054", Position = "Left" })
+local BossSection = TabFrame:NewSection({ Title = "AutoBoss", Icon = "rbxassetid://7743869054", Position = "Left" }) 
+local SettingSection = TabFrame:NewSection({ Title = "Settings", Icon = "rbxassetid://7733964719", Position = "Right" })
+
+local StatsSection = StatsTab:NewSection({ Title = "Upgrade Config", Icon = "rbxassetid://7743869054", Position = "Left" })
+local LocationSection = IslandTab:NewSection({ Title = "Maps", Icon = "rbxassetid://7743869054", Position = "Left" })
+local NPCSection = IslandTab:NewSection({ Title = "NPCs", Icon = "rbxassetid://7733964719", Position = "Right" })
+
+-- Farm Level
+FarmSection:NewToggle({
+    Title = "Auto Farm Level", Default = false,
+    Callback = function(V) 
+        _G.AutoFarm = V
+        if V then _G.AutoBoss = false; _G.AutoDungeon = false; _G.AutoFarmMonster = false; _G.AutoTanjiro = false end
+    end
+})
+
+-- Dungeon
+DungeonSection:NewToggle({
+    Title = "Auto Dungeon", Default = false,
+    Callback = function(V)
+        _G.AutoDungeon = V
+        if V then _G.AutoFarm = false; _G.AutoBoss = false; _G.AutoFarmMonster = false; _G.AutoTanjiro = false end
+    end,
+})
+
+-- Material (Tanjiro)
+MaterialSection:NewToggle({
+    Title = "AutoTanjiro (Farm 50 -> Boss)", Default = false,
+    Callback = function(Value)
+        _G.AutoTanjiro = Value
+        if Value then
+            _G.AutoFarm = false; _G.AutoBoss = false; _G.AutoDungeon = false; _G.AutoFarmMonster = false
+            _G.TanjiroKillCount = 0
+            
+            task.spawn(function()
+                print(">>> Auto Tanjiro Started")
+                while _G.AutoTanjiro do
+                    if _G.TanjiroKillCount < 50 then
+                        local startPos = CFrame.new(-827, 8, 771)
+                        if (RootPart.Position - startPos.Position).Magnitude > 250 then
+                            TweenTo(startPos); task.wait(0.5)
+                        end
+
+                        local target = FindSlayerTraineeFixed()
+                        if target then
+                            TweenTo(GetFarmPosition(target.HumanoidRootPart))
+                            LockPosition(target, "Tanjiro")
+                            AttackLoop(target, "Tanjiro")
+                            
+                            if target.Humanoid.Health <= 0 then
+                                _G.TanjiroKillCount = _G.TanjiroKillCount + 1
+                            end
+                        else
+                            task.wait(1)
+                        end
+                    else
+                        -- [[ Updated Coordinates for Tanjiro Summoning ]]
+                        local summonPos = CFrame.new(-965, 8, 674)
+                        TweenTo(summonPos)
+                        task.wait(0.5)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                        task.wait(2.5)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        task.wait(0.5)
+                        
+                        local tanjiro = nil
+                        local retry = 0
+                        while not tanjiro and retry < 10 and _G.AutoTanjiro do
+                            tanjiro = FindTanjiroBoss()
+                            task.wait(1); retry = retry + 1
+                        end
+
+                        if tanjiro then
+                            TweenTo(GetFarmPosition(tanjiro.HumanoidRootPart))
+                            LockPosition(tanjiro, "Tanjiro")
+                            AttackLoop(tanjiro, "Tanjiro")
+                            if tanjiro.Humanoid.Health <= 0 then
+                                _G.TanjiroKillCount = 0 
+                                task.wait(3)
+                            end
+                        else
+                            task.wait(2)
+                        end
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end,
+})
+
+-- Farm Monster
+FarmMonsterSection:NewDropdown({ Title = "Select Monster", Data = MonsterList, Default = "Bandit", Callback = function(V) _G.SelectedMonster = V end })
+FarmMonsterSection:NewToggle({
+    Title = "Auto Farm Monster", Default = false,
+    Callback = function(V)
+        _G.AutoFarmMonster = V
+        if V then _G.AutoFarm = false; _G.AutoBoss = false; _G.AutoDungeon = false; _G.AutoTanjiro = false end
+    end
+})
+
+-- Auto Boss
+BossSection:NewDropdown({ 
+    Title = "Select Boss", 
+    Data = BossList,
+    Default = "Yuta", 
+    Callback = function(V) _G.SelectedBoss = V end 
+})
+BossSection:NewToggle({
+    Title = "Auto Boss", Default = false,
+    Callback = function(V)
+        _G.AutoBoss = V
+        if V then _G.AutoFarm = false; _G.AutoDungeon = false; _G.AutoFarmMonster = false; _G.AutoTanjiro = false end
+    end
+})
+
+-- Settings
+SettingSection:NewDropdown({ Title = "Weapon", Data = GetMyTools(), Default = "Combat", Callback = function(V) _G.SelectedWeapon = V end })
+SettingSection:NewSlider({ Title = "Distance", Min = 5, Max = 50, Default = 7, Callback = function(V) _G.Distance = V end })
+SettingSection:NewDropdown({ 
+    Title = "Position (ตำแหน่ง)", 
+    Data = {"Under (Look Up)", "Above (Look Down)", "Behind"}, 
+    Default = "Under (Look Up)", 
+    Callback = function(V) _G.PositionMode = V end 
+})
+
+SettingSection:NewToggle({ Title = "Auto Observation", Default = false, Callback = function(V) _G.AutoObservation = V; if V then task.spawn(function() while _G.AutoObservation do pcall(function() game:GetService("ReplicatedStorage").Remotes.Serverside:FireServer("Server", "Misc", "Observation", 1) end) task.wait(3) end end) end end })
+
+SettingSection:NewToggle({
+    Title = "Auto Haki (On Spawn)", Default = false,
+    Callback = function(V)
+        _G.AutoHaki = V
+        if V then
+            pcall(function() 
+                local args = { "Server", "Misc", "Haki", 1 }
+                game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Serverside"):FireServer(unpack(args))
+            end)
+        end
+    end
+})
+
+SettingSection:NewToggle({ Title = "Auto Skill", Default = true, Callback = function(V) _G.AutoSkillSpam = V end })
+
+-- [[ REORDERED SETTINGS ]]
+SettingSection:NewToggle({ 
+    Title = "Show Boss UI", 
+    Default = true, 
+    Callback = function(V) _G.ShowBossUI = V end 
+})
+
+SettingSection:NewButton({ Title = "Server Hop (หาห้องใหม่)", Callback = function() ServerHop() end })
+
+SettingSection:NewButton({
+    Title = "Discord",
+    Callback = function()
+        setclipboard("https://discord.gg/NeGv59fYEd")
+    end
+})
+
+-- Stats
+local StatsAmount = 1
+StatsSection:NewSlider({ Title = "Amount", Min = 1, Max = 100, Default = 1, Callback = function(v) StatsAmount = v end })
+local function FireUpgradeStats(StatName) pcall(function() game:GetService("Players").LocalPlayer.PlayerGui.Button.Stats_Frame["{}"]:WaitForChild("Event"):FireServer(StatName, StatsAmount) end) end
+StatsSection:NewToggle({ Title = "Auto Strength", Default = false, Callback = function(s) local AutoStrength = s; task.spawn(function() while AutoStrength do task.wait(0.1) FireUpgradeStats("Strength") end end) end })
+StatsSection:NewToggle({ Title = "Auto Defense", Default = false, Callback = function(s) local AutoDefense = s; task.spawn(function() while AutoDefense do task.wait(0.1) FireUpgradeStats("Defense") end end) end })
+StatsSection:NewToggle({ Title = "Auto Sword", Default = false, Callback = function(s) local AutoSword = s; task.spawn(function() while AutoSword do task.wait(0.1) FireUpgradeStats("Sword") end end) end })
+StatsSection:NewToggle({ Title = "Auto Power", Default = false, Callback = function(s) local AutoPower = s; task.spawn(function() while AutoPower do task.wait(0.1) FireUpgradeStats("Power") end end) end })
+StatsSection:NewButton({ Title = "Reset Stats", Callback = function() pcall(function() game:GetService("ReplicatedStorage").Remotes.Serverside:FireServer("Server", "Stats", "Reset") end) end })
+
+-- Map / NPC
+local mapNames = {}; if workspace:FindFirstChild("Maps") then for _, m in pairs(workspace.Maps:GetChildren()) do if m:IsA("Model") and m.Name ~= "SeaHitbox" then table.insert(mapNames, m.Name) end end end; table.sort(mapNames)
+LocationSection:NewDropdown({ Title = "Select Map", Data = mapNames, Default = "Select Map", Callback = function(v) local tm = workspace.Maps:FindFirstChild(v); if tm and tm.PrimaryPart then LocalPlayer.Character.HumanoidRootPart.CFrame = tm.PrimaryPart.CFrame * CFrame.new(0,10,0) end end })
+
+local swordNpcNames = {}; local swordFolder = workspace.Main:FindFirstChild("NPCs") and workspace.Main.NPCs:FindFirstChild("Sword"); if swordFolder then for _, n in pairs(swordFolder:GetChildren()) do if n:IsA("Model") then table.insert(swordNpcNames, n.Name) end end end; table.sort(swordNpcNames)
+NPCSection:NewDropdown({ Title = "Select Sword NPC", Data = swordNpcNames, Default = "Select NPC", Callback = function(v) if swordFolder then local t = swordFolder:FindFirstChild(v); if t and t:FindFirstChild("HumanoidRootPart") then LocalPlayer.Character.HumanoidRootPart.CFrame = t.HumanoidRootPart.CFrame * CFrame.new(0,5,0) end end end })
+
+-- ==============================
+-- 6. Main Logic Loop (Consolidated)
+-- ==============================
+task.spawn(function()
+    while task.wait(0.5) do
+        local DidAction = false
+        
+        -- Auto Boss
+        if _G.AutoBoss and not DidAction then
+            pcall(function()
+                local bossPath = BossData[_G.SelectedBoss]
+                local bossModel = GetFolderFromPath(bossPath)
+                if bossModel and bossModel:FindFirstChild("Humanoid") and bossModel.Humanoid.Health > 0 then
+                    DidAction = true
+                    TweenTo(GetFarmPosition(bossModel.HumanoidRootPart))
+                    LockPosition(bossModel, "Boss")
+                    AttackLoop(bossModel, "Boss")
+                end
+            end)
+        end
+
+        -- Auto Dungeon
+        if _G.AutoDungeon and not DidAction then
+            pcall(function()
+                if workspace.Main:FindFirstChild("Characters") and workspace.Main.Characters:FindFirstChild("Dungeon") then
+                    local dPath = workspace.Main.Characters.Dungeon
+                    local target = nil
+                    if dPath:FindFirstChild("Boss") then target = GetRandomMob(dPath.Boss) end
+                    if not target and dPath:FindFirstChild("Mob") then target = GetRandomMob(dPath.Mob) end
+                    if target then
+                        DidAction = true
+                        TweenTo(GetFarmPosition(target.HumanoidRootPart))
+                        LockPosition(target, "Dungeon")
+                        AttackLoop(target, "Dungeon")
+                    end
+                end
+            end)
+        end
+
+        -- Auto Farm Monster
+        if _G.AutoFarmMonster and not DidAction then
+            pcall(function()
+                local mobName = _G.SelectedMonster
+                local pathData = MonsterLocations[mobName]
+                local mobFolder
+                
+                if mobName == "Desert Thief" or mobName == "Katana Master" then
+                    mobFolder = workspace.Main.Characters["Sandora Island"]
+                elseif pathData then
+                    mobFolder = GetFolderFromPath(pathData)
+                end
+                
+                if not mobFolder and workspace.Main.Characters:FindFirstChild("Sandora Island") then mobFolder = workspace.Main.Characters["Sandora Island"] end
+
+                if mobFolder then
+                    local target = GetClosestMob(mobFolder, mobName)
+                    if target then
+                        DidAction = true
+                        TweenTo(GetFarmPosition(target.HumanoidRootPart))
+                        LockPosition(target, "FarmMonster")
+                        AttackLoop(target, "FarmMonster")
+                    end
+                end
+            end)
+        end
+
+        -- Auto Farm Level (Legacy)
+        if _G.AutoFarm and not DidAction then
+            pcall(function()
+                local level = LocalPlayer.Info.Level.Value
+                local questData = {
+                    {l=0,q="1",f={"Main","Characters","Windmill Village","Bandit"},n="Bandit"},
+                    {l=100,q="2",f={"Main","Characters","Windmill Village","Bandit Leader"},n="Bandit Leader"},
+                    {l=200,q="3",f={"Main","Characters","Whispering Jungle","Skeleton"},n="Skeleton"},
+                    {l=300,q="4",f={"Main","Characters","Whispering Jungle","Pirate Skeleton"},n="Pirate Skeleton"},
+                    {l=450,q="5",f={"Main","Characters","Sandora Island","Desert Thief"},n="Desert Thief"},
+                    {l=600,q="6",f={"Main","Characters","Sandora Island","Katana Master"},n="Katana Master"},
+                    {l=750,q="7",f={"Main","Characters","Glacier Isle","Mihawk"},n="Mihawk"},
+                    {l=1000,q="8",f={"Main","Characters","Forge Isle","Slayer's Trainee"},n="Slayer's Trainee"},
+                    {l=1500,q="9",f={"Main","Characters","Jujutsu Highschool","Sorcerer's Student"},n="Sorcerer's Student"},
+                    {l=2000,q="10",f={"Main","Characters","Jujutsu Highschool","Sorcerer's Teacher"},n="Sorcerer's Teacher"},
+                    {l=3500,q="11",f={"Main","Characters","Konoha Village","Konoha's Ninja"},n="Konoha's Ninja"},
+                    {l=4500,q="12",f={"Main","Characters","Konoha Village","Konoha's Head Ninja"},n="Konoha's Head Ninja"}
+                }
+                local current = questData[1]
+                for _,v in ipairs(questData) do if level >= v.l then current = v end end
+                local npc = workspace.Main.NPCs.Quests[current.q].HumanoidRootPart
+                
+                if not HasQuest() then
+                    if (RootPart.Position - npc.Position).Magnitude > 3 then TweenTo(npc.CFrame) end
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game); task.wait(1.5); VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    task.wait(1)
+                else
+                    local mobFolder = GetFolderFromPath(current.f)
+                    if current.n == "Katana Master" or current.n == "Desert Thief" then mobFolder = workspace.Main.Characters["Sandora Island"] end
+                    local target = GetClosestMob(mobFolder, current.n)
+                    if target then
+                        DidAction = true
+                        TweenTo(GetFarmPosition(target.HumanoidRootPart))
+                        LockPosition(target, "Farm")
+                        AttackLoop(target, "Farm")
+                    end
+                end
+            end)
+        end
+    end
+end)
